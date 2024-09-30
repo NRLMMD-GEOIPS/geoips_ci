@@ -1,0 +1,45 @@
+name: Check release branch
+
+on:
+  workflow_call:
+    outputs:
+      IS_VERSION_RELEASE_BRANCH:
+        description: "Determine if the current branch is a version release branch"
+        value: ${{ jobs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH}}
+      IS_FINAL_RELEASE_BRANCH:
+        description: "Determine if the current branch is a final release branch"
+        value: ${{ jobs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH}}
+
+jobs:
+  check-release-branch:
+    runs-on: ${{ vars.RUNNER }}
+    name: Check release branch
+    outputs:
+      # Note pull request merged does not propagate to reusable workflows
+      IS_VERSION_RELEASE_BRANCH: ${{ steps.id_release_branch.outputs.IS_VERSION_RELEASE_BRANCH }}
+      IS_FINAL_RELEASE_BRANCH: ${{ steps.id_release_branch.outputs.IS_FINAL_RELEASE_BRANCH }}
+    steps:
+      - name: Determine if this is an initial release branch
+        id: id_release_branch
+        run: |
+          echo "Head ref: ${GITHUB_HEAD_REF}"
+          echo "Base ref: ${GITHUB_BASE_REF}"
+          if [[ "${GITHUB_HEAD_REF}" =~ "v"*"-version-release" ]]; then
+            echo "IS_VERSION_RELEASE_BRANCH=true"
+            echo "IS_VERSION_RELEASE_BRANCH=true" >> $GITHUB_ENV
+            echo "IS_VERSION_RELEASE_BRANCH=true" >> $GITHUB_OUTPUT
+          else
+            echo "IS_VERSION_RELEASE_BRANCH=false"
+            echo "IS_VERSION_RELEASE_BRANCH=false" >> $GITHUB_ENV
+            echo "IS_VERSION_RELEASE_BRANCH=false" >> $GITHUB_OUTPUT
+          fi
+
+          if [[ "${GITHUB_HEAD_REF}" =~ "v"*"-finalize-release-notes" ]]; then
+            echo "IS_FINAL_RELEASE_BRANCH=true"
+            echo "IS_FINAL_RELEASE_BRANCH=true" >> $GITHUB_ENV
+            echo "IS_FINAL_RELEASE_BRANCH=true" >> $GITHUB_OUTPUT
+          else
+            echo "IS_FINAL_RELEASE_BRANCH=false"
+            echo "IS_FINAL_RELEASE_BRANCH=false" >> $GITHUB_ENV
+            echo "IS_FINAL_RELEASE_BRANCH=false" >> $GITHUB_OUTPUT
+          fi

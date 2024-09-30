@@ -1,0 +1,157 @@
+name: Check release notes for proper edits
+
+on:
+  # Reusable workflow
+  workflow_call:
+
+# Assuming this trigger is contained in individual plugin repository workflows.
+# # We only need to check status of release notes from pull requests.
+# # This is just to make sure things were modified appropriately -
+# # by the time we merge to default branch or perform a release,
+# # this check won't mean anything, so don't include it for other
+# # triggers.
+# on:
+#   # Triggers the workflow when pull request created and updated
+#   pull_request:
+#   # Allows run of this workflow manually from the Actions tab
+#   workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check-release-branch:
+    name: Check release branch
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-check-release-branch.yaml@main
+
+  # Set variables that should be accessible to all jobs
+  get-job-flags:
+    runs-on: ${{ vars.RUNNER }}
+    outputs:
+      CHECK_NEW_RELEASE_NOTE: ${{ steps.get_job_flags.outputs.CHECK_NEW_RELEASE_NOTE }}
+    steps:
+      - name: Get job flags
+        id: get_job_flags
+        run: |
+          # Define an array of flags and their corresponding secret values
+          flags=(CHECK_NEW_RELEASE_NOTE)
+          for flag in "${flags[@]}"; do
+              # Dynamically construct the variable name and access the corresponding secret
+              case $flag in
+                  CHECK_NEW_RELEASE_NOTE) val="${{ vars.CHECK_NEW_RELEASE_NOTE }}" ;;
+              esac
+              # Check if the secret value is "true" and set the environment variable and output
+              if [ "$val" == "false" ]; then
+                  echo "${flag}=false"
+                  echo "${flag}=false" >> $GITHUB_ENV
+                  echo "${flag}=false" >> $GITHUB_OUTPUT
+              else
+                  echo "${flag}=true"
+                  echo "${flag}=true" >> $GITHUB_ENV
+                  echo "${flag}=true" >> $GITHUB_OUTPUT
+              fi
+          done
+
+  print-variables:
+    name: Print variables
+    needs: [check-release-branch, get-job-flags]
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
+    with:
+      # These are outputs defined in the check-release-branch and get-versions
+      # reusable workflows.  Explicitly pass them in here to track what
+      # variables we have available to this workflow.
+      IS_VERSION_RELEASE_BRANCH: ${{ needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH }}
+      IS_FINAL_RELEASE_BRANCH: ${{ needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH }}
+      CHECK_NEW_RELEASE_NOTE: ${{ needs.get-job-flags.outputs.CHECK_NEW_RELEASE_NOTE }}
+
+  #################################################
+  # OLD Release Note NOT Added
+  #################################################
+  check_release_notes:
+    if: >
+      always() &&
+      needs.get-job-flags.outputs.CHECK_NEW_RELEASE_NOTE == 'true'
+    needs: [check-release-branch, get-job-flags]
+    # This can run on the "standard" runner, no specific settings required.
+    runs-on: ${{ vars.RUNNER }}
+    steps:
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory $PWD
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ./current_repo_current_branch
+      - name: Detect new and modified RST release note files
+        run: |
+          #update_this_file="$(cat update_this_release_note)"
+          release_notes_dir="$PWD/current_repo_current_branch/docs/source/releases" #/$(dirname $update_this_file)"
+          echo "Checking for no edits to the .rst release note in dir $release_notes_dir"
+          if [[ "${{ github.base_ref }}" != "" ]]; then
+              target_ref=${{ github.base_ref }}
+          else
+              target_ref=${{ github.event.repository.default_branch }}
+          fi
+          echo "git -C $PWD/current_repo_current_branch fetch"
+          git -C $PWD/current_repo_current_branch fetch
+          echo "git -C $PWD/current_repo_current_branch diff --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst"
+          ret=$(git -C $PWD/current_repo_current_branch diff --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst)
+          for file in ${ret[@]}; do
+              echo "    $file"
+          done
+          if [ -z "$ret" ]; then
+              echo "PASSED"
+          else
+              echo "FAILED: Release note changes detected"
+              echo "Please use brassy to enter change logs in $release_notes_dir"
+              echo "DO NOT EDIT .RST FILES DIRECTLY :))"
+              exit 1
+          fi
+      - name: Detect new and modified YAML release note files
+        # Don't try to check this if we are on default branch,
+        # it is checking against default, so wouldn't show up as modified.
+        # It would be on default branch if we were running this on push
+        # (ie, not pull-request)
+        # Also don't try to check this if we are on the final release branch.
+        # We do not need to check the release notes when we are on the final
+        # release branch, because it is an automated finalization of the
+        # release notes, so there is no requirement to manually update.
+        if: >
+          github.ref_name != github.event.repository.default_branch &&
+          needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH != 'true'
+        run: |
+          echo "Checking for new and modified YAML release note files in $PWD"
+          echo "final release branch needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH "
+          echo ${{ needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH }}
+          #update_this_file="$(cat update_this_release_note)"
+          release_notes_dir="$PWD/current_repo_current_branch/docs/source/releases/latest" #/$(dirname $update_this_file)"
+          ls $release_notes_dir
+          if [[ "${{ github.base_ref }}" != "" ]]; then
+              target_ref=${{ github.base_ref }}
+          else
+              target_ref=${{ github.event.repository.default_branch }}
+          fi
+          #current_release_note=`cat update_this_release_note`
+          echo "git -C $PWD/current_repo_current_branch fetch"
+          git -C $PWD/current_repo_current_branch fetch
+          # If this is the final release branch, then we are just moving release notes,
+          # note modifying.  In that case, allow renamed as well as added or modified.
+          if [[ ${{ needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH == 'true' }} ]]; then
+            echo "git -C ./current_repo_current_branch diff --name-only --diff-filter=RAM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml"
+            ret=$(git -C ./current_repo_current_branch diff --name-only --diff-filter=RAM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml)
+          else
+            echo "git -C ./current_repo_current_branch diff --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml"
+            ret=$(git -C ./current_repo_current_branch diff --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml)
+          fi
+          echo "Release note files modified this PR:"
+          for file in ${ret[@]}; do
+              echo "    $file"
+          done
+          if [ -z "$ret" ]; then
+              echo "FAILED: No yaml release note changes detected"
+              echo "Please use brassy to enter change logs in $release_notes_dir"
+              exit 1
+          else
+              echo "PASSED"
+          fi
