@@ -1,0 +1,86 @@
+name: Print variables
+
+on:
+  workflow_call:
+    inputs:
+      IS_VERSION_RELEASE_BRANCH:
+        type: string
+        required: false
+      IS_FINAL_RELEASE_BRANCH:
+        type: string
+        required: false
+      TAGGED_VERSION:
+        type: string
+        required: false
+      UPCOMING_VERSION:
+        type: string
+        required: false
+      CHECK_NEW_RELEASE_NOTE:
+        type: string
+        required: false
+      CI_LINT_BANDIT:
+        type: string
+        required: false
+      CI_LINT_DOC8:
+        type: string
+        required: false
+      CI_LINT_FLAKE8:
+        type: string
+        required: false
+      CI_LINT_BLACK:
+        type: string
+        required: false
+
+jobs:
+  print-variables:
+    runs-on: ${{ vars.RUNNER }}
+    name: Print variables
+    steps:
+      - name: Print run flags
+        run: |
+          echo "Standard variables:"
+          echo "github.ref_name ${{ github.ref_name }}"
+          echo "github.ref ${{ github.ref }}"
+          echo "github.base_ref ${{ github.base_ref }}"
+          echo "github.head_ref ${{ github.head_ref }}"
+          echo "vars.RUNNER ${{ vars.RUNNER }}"
+          echo "vars.RUNNER_DOCKERBUILD ${{ vars.RUNNER_DOCKERBUILD }}"
+          echo "vars.RUNNER_DOCKERRUN ${{ vars.RUNNER_DOCKERRUN }}"
+          echo "github.event.repository.default_branch ${{ github.event.repository.default_branch }}"
+          echo "github.event.repository.name ${{ github.event.repository.name }}"
+          echo "github.event.pull_request.merged ${{ github.event.pull_request.merged }}"
+          echo "github.run_id ${{ github.run_id }}"
+          echo "github.run_attempt ${{ github.run_attempt }}"
+          echo "vars.USE_CONDA_FOR_ACTIONS ${{ vars.USE_CONDA_FOR_ACTIONS }}"
+          echo ""
+          echo "Input variables:"
+          echo "version release branch: ${{ inputs.IS_VERSION_RELEASE_BRANCH }}"
+          echo "final release branch: ${{ inputs.IS_FINAL_RELEASE_BRANCH }}"
+          echo "tagged version (after release): ${{ inputs.TAGGED_VERSION }}"
+          echo "upcoming version (after release): ${{ inputs.UPCOMING_VERSION }}"
+          echo ""
+          echo "Github context:"
+          echo "$GITHUB_CONTEXT"
+          echo ${{ github.context }}
+          echo ""
+          echo "CI flags:"
+          echo "CI_LINT_BANDIT: ${{ inputs.CI_LINT_BANDIT }}"
+          echo "CI_LINT_DOC8: ${{ inputs.CI_LINT_DOC8 }}"
+          echo "CI_LINT_FLAKE8: ${{ inputs.CI_LINT_FLAKE8 }}"
+          echo "CI_LINT_BLACK: ${{ inputs.CI_LINT_BLACK }}"
+          echo "CHECK_NEW_RELEASE_NOTE: ${{ inputs.CHECK_NEW_RELEASE_NOTE }}"
+
+          # for var in $(echo '${{ toJson(needs.set-variables.outputs) }}' | jq -r 'keys[]'); do
+          if [[ "${{ inputs.FLAGS }}" != "" ]]; then
+            for var in $(echo '${{ toJson(inputs.FLAGS) }}' | jq -r 'keys[]'); do
+              value=$(echo '${{ toJson(inputs.FLAGS) }}' | jq -r --arg var "$var" '.[$var]')
+              echo "$var=$value"
+            done
+          fi
+          echo "Target ref:"
+          if [[ "${{ github.base_ref }}" != "" ]]; then
+              target_ref=${{ github.base_ref }}
+          else
+              target_ref=${{ github.event.repository.default_branch }}
+          fi
+          echo "remotes/origin/${target_ref}"

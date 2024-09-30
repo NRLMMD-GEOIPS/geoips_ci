@@ -1,0 +1,98 @@
+name: Tag/release
+
+# 1. Brassy - on PR merge of v*-version-release
+#    * move YAML release notes to correct version directories
+#    * commit and push to v*-finalize-release-notes
+#    * open PR to default branch
+# 2. Tag and Release - on PR merge of v*-finalize-release-notes
+#    * Tag current version
+#    * Release just tagged version
+# 3. Package and Publish - on published release (from #2)
+#    * Build wheel
+#    * Publish to pypi
+# 4. Deploy docs - on published release (from #2)
+#    * pip install geoips
+#    * pip install plugin repo
+#    * build docs with geoips/docs/build_docs.sh
+#    * deploy docs with geoips/docs/deploy_pages.sh
+
+on:
+  workflow_call:
+    secrets:
+      token:
+        required: true
+
+# Assuming this is in the plugin repo's workflow file.
+# on:
+#   workflow_dispatch:
+#   # Triggers the workflow when pull request created and updated
+#   pull_request:
+#     types:
+#       - closed
+#     branch: main
+
+jobs:
+  check-release-branch:
+    name: Check release branch
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-check-release-branch.yaml@main
+
+  get-versions:
+    name: Get versions
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-get-versions.yaml@main
+    permissions:
+      contents: read
+    secrets:
+      token: ${{ secrets.token }}
+
+  print-variables:
+    name: Print variables
+    needs: [check-release-branch, get-versions]
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
+    with:
+      # These are outputs defined in the check-release-branch and get-versions
+      # reusable workflows.  Explicitly pass them in here to track what
+      # variables we have available to this workflow.
+      IS_VERSION_RELEASE_BRANCH: ${{ needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH }}
+      IS_FINAL_RELEASE_BRANCH: ${{ needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH }}
+      TAGGED_VERSION: ${{ needs.get-versions.outputs.TAGGED_VERSION }}
+      UPCOMING_VERSION: ${{ needs.get-versions.outputs.UPCOMING_VERSION }}
+
+  tag-and-release:
+    runs-on: ${{ vars.RUNNER }}
+    name: Tag/release
+    permissions:
+      contents: write
+    needs: [check-release-branch, get-versions]
+    if: needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH == 'true'
+    steps:
+      - name: Checkout current plugin current branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.token }}
+          path: current_repo_current_branch
+
+      - name: Setup git enviorment
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'github-actions@${GITHUB_SERVER_URL/https:\/\//}'
+
+      - name: Tag commit
+        run: |
+          git -C current_repo_current_branch tag ${{ needs.get-versions.outputs.TAGGED_VERSION }}
+
+      - name: Push tags to branch
+        run: |
+          git -C current_repo_current_branch push --set-upstream origin ${{ steps.new_branch_name.outputs.new_branch_name }} --tags
+
+      - name: Create Release!
+        run: |
+          cd current_repo_current_branch
+          SERVER_URL=${GITHUB_SERVER_URL/https:\/\//}
+          echo ${{ secrets.token }} | gh auth login --hostname ${SERVER_URL} --with-token
+
+          echo "gh release create ${{ needs.get-versions.outputs.TAGGED_VERSION }} --generate-notes"
+
+          gh release create ${{ needs.get-versions.outputs.TAGGED_VERSION }} \
+            --generate-notes

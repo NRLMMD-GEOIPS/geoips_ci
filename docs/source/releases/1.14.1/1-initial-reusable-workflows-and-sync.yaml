@@ -1,0 +1,66 @@
+GitHub Actions:
+- title: 'Reusable PR-merge and tag based workflows'
+  description: |
+    *From GEOIPS#562: 2024-09-24, 1.14.1 updates*
+
+     Since PR-merge and tag based workflows can not be run
+     via repository rulesets, create reusable workflows
+     that we can call from each repository.  The workflows
+     included in the sync directory call these reusable workflows.
+     Eventually we will move all actions to this repository as
+     repository rulesets (since that will allow us to use these
+     workflows from repositories outside the organization, supporting
+     our collaborators), but for now start with the PR-merge and
+     tag based workflows which we could not run across the organization
+     via rulesets.
+  files:
+    added:
+    - .github/reusable-brassy-notes.yaml
+    - .github/reusable-check-release-branch.yaml
+    - .github/reusable-deploy-docs.yaml
+    - .github/reusable-get-versions.yaml
+    - .github/reusable-lint.yaml
+    - .github/reusable-package-and-publish.yaml
+    - .github/reusable-print-variables.yaml
+    - .github/reusable-proper-release-note-edits.yaml
+    - .github/reusable-tag-and-release.yaml
+    - .github/workflows/brassy-notes.yaml
+    - .github/workflows/proper-release-note-edits.yaml
+    - .github/workflows/tag-and-release.yaml
+    deleted:
+    - ''
+    modified:
+    - ''
+    moved:
+    - ''
+  related-issue:
+    number: 562
+    repo_url: GEOIPS/geoips
+- title: 'Create directory of files to sync to all plugin repositories'
+  description: |
+    *From GEOIPS#562: 2024-09-24, 1.14.1 updates*
+
+    Add common files between all repositories.  This includes the
+    new workflows that call the geoips_ci reusable workflows, as
+    well as automated linting config files (for automated consistent
+    linting across all geoips plugins), and other standard files.
+  files:
+    added:
+    - sync/bandit.yml
+    - sync/CHANGELOG.rst
+    - sync/CODE_OF_CONDUCT.md
+    - sync/DISTRIBUTION
+    - sync/.flake8
+    - sync/.github
+    - sync/.gitignore
+    - sync/pytest.ini
+    - sync/.github/release.yml
+    - sync/.github/workflows/brassy-notes.yaml
+    - sync/.github/workflows/deploy-docs.yaml
+    - sync/.github/workflows/lint.yaml
+    - sync/.github/workflows/package-and-publish.yaml
+    - sync/.github/workflows/proper-release-note-edits.yaml
+    - sync/.github/workflows/tag-and-release.yaml
+  related-issue:
+    number: 562
+    repo_url: 'GEOIPS/geoips'

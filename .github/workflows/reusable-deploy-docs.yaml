@@ -1,0 +1,186 @@
+name: Deploy docs
+
+# 1. Brassy - on PR merge of v*-version-release
+#    * move YAML release notes to correct version directories
+#    * commit and push to v*-finalize-release-notes
+#    * open PR to default branch
+# 2. Tag and Release - on PR merge of v*-finalize-release-notes
+#    * Tag current version
+#    * Release just tagged version
+# 3. Package and Publish - on published release (from #2)
+#    * Build wheel
+#    * Publish to pypi
+# 4. Deploy docs - on published release (from #2)
+#    * pip install geoips
+#    * pip install plugin repo
+#    * build docs with geoips/docs/build_docs.sh
+#    * deploy docs with geoips/docs/deploy_pages.sh
+
+on:
+  workflow_call:
+    secrets:
+      token:
+        required: true
+
+# Assuming this is in the plugin repo's workflow file.
+# on:
+#   # triggers the workflow on published release
+#   releases:
+#     types:
+#       - published
+#   # allows run of this workflow manually from the actions tab
+#   # must be merged to default branch before it will be available to manually run.
+#   workflow_dispatch:
+
+jobs:
+  print-variables:
+    name: Print variables
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
+
+  deploy_ghpages:
+    runs-on: ${{ vars.RUNNER }}
+    name: "Build and deploy docs to GitHub Pages"
+    permissions:
+      contents: write
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v4 # v4is the latest for setup-python
+        with:
+          python-version: "pypy-3.10"  # I believe 3.10 is the latest for actions
+          check-latest: true
+      - name: Update pip
+        run: pip install --upgrade pip
+
+      - name: Checkout geoips repo default branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          repository: ${{ vars.GEOIPS_ORGANIZATION }}/geoips
+          ref: ${{ vars.GEOIPS_DEFAULT_BRANCH }}
+          token: ${{ secrets.token }}
+          path: geoips_default_branch
+
+      - name: pip install geoips_default_branch[doc,lint,test]
+        run: |
+          which pip
+          pip uninstall -y geoips
+          # Include test dependency for full documentation
+          # lint required for pink (rst linting)
+          pip install $PWD/geoips_default_branch[doc,lint,test]
+          ret=$?
+          echo "${ret}"
+          python -c "import geoips; print(geoips.__version__)"
+
+      - name: Checkout current plugin current branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.token }}
+          path: current_repo_current_branch
+
+      - name: pip install geoips plugin repo
+        run: |
+          which pip
+          curr_repo=`echo "$GITHUB_REPOSITORY" | sed "s,$GITHUB_REPOSITORY_OWNER/,,"`
+          # Do not re-install if this is the geoips repo
+          if [[ "$curr_repo" != "geoips" ]]; then
+              # If we are specifically "template_basic_plugin" repo, then we must use
+              # my_package as the package name.  Otherwise the package name matches
+              # the plugin name.
+              run_on_package=$curr_repo
+              if [[ "$curr_repo" == "template_basic_plugin" ]]; then
+                run_on_package=my_package
+              fi
+              pip uninstall -y $run_on_package
+              pip install -v $PWD/current_repo_current_branch
+              ret=$?
+              echo "${ret}"
+              python -c "import $run_on_package; print($run_on_package.__version__)"
+          fi
+      - name: create_plugin_registries
+        run: |
+          echo "create plugin registries"
+          which create_plugin_registries
+          create_plugin_registries
+          ret=$?
+          echo "${ret}"
+
+      - name: Run build docs
+        run: |
+          which pip
+          echo "Build html docs"
+          # Ie, get 'recenter_tc' out of 'NRLMMD-GEOIPS/recenter_tc'
+          curr_repo=`echo "$GITHUB_REPOSITORY" | sed "s,$GITHUB_REPOSITORY_OWNER/,,"`
+          # Call build_docs.sh from the geoips default branch
+          # Pass in
+          #   the path to the current plugin repo,
+          #   the name of the current repo,
+          #   "html_pdf" to indicate producing both html and pdf output, and
+          #   the path to the docs template directory in the geoips default branch.
+
+          # If we are specifically "template_basic_plugin" repo, then we must use
+          # my_package as the package name.  Otherwise the package name matches
+          # the plugin name.
+          run_on_package=$curr_repo
+          if [[ "$curr_repo" == "template_basic_plugin" ]]; then
+            run_on_package=my_package
+          fi
+          # Note pdf build failing right now - temporarily only produce html so it works
+          # ./geoips_default_branch/docs/build_docs.sh ./current_repo_current_branch $curr_repo html_pdf ./geoips_default_branch/docs
+          ./geoips_default_branch/docs/build_docs.sh ./current_repo_current_branch $run_on_package html_only ./geoips_default_branch/docs
+          ret=$?
+          if [[ "${ret##*:}" != *"0"* ]]; then
+            echo "::error::Building html docs ${ret##*:}"
+            exit 1
+          fi
+      - name: Run deploy docs
+        run: |
+          which pip
+          echo "Deploy docs to github pages"
+          # GITHUB_REPOSITORY, GITHUB_REPOSITORY_OWNER, and GITHUB_SERVER_URL are all
+          # standard github variables defined for every github actions run.
+          # Ie, get 'recenter_tc' out of 'NRLMMD-GEOIPS/recenter_tc'
+          curr_repo=`echo "$GITHUB_REPOSITORY" | sed "s,$GITHUB_REPOSITORY_OWNER/,,"`
+          # ie, https://github.com/NRLMMD-GEOIPS
+          GEOIPS_REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY_OWNER"
+          # Remove ghpages_repo dir if it exists.
+          # deploy_pages.sh will not run if ghpages_repo exists.
+          if [[ -d ./ghpages_repo ]]; then
+              echo "::group::remove_ghpages_before"
+              echo "Remove ghpages_repo before deploy"
+              echo "rm -rfv ./ghpages_repo"
+              rm -rfv ./ghpages_repo
+              echo "::endgroup::"
+              rmret=$?
+              if [[ "${rmret##*:}" != *"0"* ]]; then
+                echo "::error::Removing ./ghpages_repo before deploy ${rmret##*:}"
+                exit 1
+              fi
+          fi
+          # Use the deploy_pages.sh script from the geoips default branch.
+          # Pass in the
+          #   current plugin repo path,
+          #   the geoips repo url, and
+          #   a path to a new directory for the ghpages checkout/push
+          #   the name of the current repository
+          ./geoips_default_branch/docs/deploy_pages.sh ./current_repo_current_branch $GEOIPS_REPO_URL ./ghpages_repo $curr_repo
+          ret=$?
+          if [[ "${ret##*:}" != *"0"* ]]; then
+            echo "::error::Deploying docs to GitHub pages ${ret##*:}"
+            exit 1
+          fi
+          # Remove ghpages_repo dir after running deploy_pages.sh.
+          # deploy_pages.sh will not run if ghpages_repo exists.
+          if [[ -d ./ghpages_repo ]]; then
+              echo "::group::remove_ghpages_after"
+              echo "Remove ghpages_repo after deploy"
+              echo "rm -rfv ./ghpages_repo"
+              rm -rfv ./ghpages_repo
+              echo "::endgroup::"
+              rmret=$?
+              if [[ "${rmret##*:}" != *"0"* ]]; then
+                echo "::error::Removing ./ghpages_repo after deploy ${rmret##*:}"
+                exit 1
+              fi
+          fi

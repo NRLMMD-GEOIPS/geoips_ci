@@ -1,0 +1,68 @@
+name: Package/publish
+
+# 1. Brassy - on PR merge of v*-version-release
+#    * move YAML release notes to correct version directories
+#    * commit and push to v*-finalize-release-notes
+#    * open PR to default branch
+# 2. Tag and Release - on PR merge of v*-finalize-release-notes
+#    * Tag current version
+#    * Release just tagged version
+# 3. Package and Publish - on published release (from #2)
+#    * Build wheel
+#    * Publish to pypi
+# 4. Deploy docs - on published release (from #2)
+#    * pip install geoips
+#    * pip install plugin repo
+#    * build docs with geoips/docs/build_docs.sh
+#    * deploy docs with geoips/docs/deploy_pages.sh
+
+on:
+  workflow_call:
+    secrets:
+      token:
+        required: true
+      pypi_user:
+        required: false
+      pypi_password:
+        required: false
+
+# Assuming this is in the plugin repo's workflow file.
+# on:
+#   # triggers the workflow on published release
+#   releases:
+#     types:
+#       - published
+#   # allows run of this workflow manually from the actions tab
+#   workflow_dispatch:
+
+jobs:
+  print-variables:
+    name: Print variables
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
+
+  package_and_publish:
+    name: "Deploy to Pypi"
+    runs-on: ${{ vars.RUNNER }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout current plugin current branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          token: ${{ secrets.token }}
+
+      - name: Create distributions
+        shell: bash -l {0}
+        run: |
+          python -m pip install -U build pip
+          python -m build
+
+        - name: Publish package to PyPI
+          # upload to PyPI on every release for a tag starting with 'v'
+          # if: github.event.action == 'published' && startsWith(github.event.release.tag_name, 'v')
+          uses: pypa/gh-action-pypi-publish@v1.8.10
+          with:
+            user: ${{ secrets.pypi_user }}
+            password: ${{ secrets.pypi_password }}
