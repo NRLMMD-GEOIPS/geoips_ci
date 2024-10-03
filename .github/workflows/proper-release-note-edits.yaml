@@ -11,6 +11,6 @@ jobs:
   note-edits:
     name: Note edits
     # You do not appear to be able to use variables in the "uses" field.
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-proper-release-note-edits.yaml@v1.14.1-release
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-proper-release-note-edits.yaml@main
     permissions:
       contents: read
