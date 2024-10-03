@@ -1,0 +1,25 @@
+GitHub Actions:
+- title: 'Replace GEOIPS_TOKEN with GITHUB_TOKEN'
+  description: |
+    *From NRLMMD-GEOIPS/geoips#740: 2024-10-01, 1.14.1 updates*
+
+    Replace GEOIPS_TOKEN with GITHUB_TOKEN so outside users do not have to
+    have a GEOIPS_TOKEN defined in order to use workflows.
+  files:
+    modified:
+    - .github/workflows/brassy-notes.yaml
+    - .github/workflows/tag-and-release.yaml
+    - sync/.github/workflows/brassy-notes.yaml
+    - sync/.github/workflows/deploy-docs.yaml
+    - sync/.github/workflows/lint.yaml
+    - sync/.github/workflows/package-and-publish.yaml
+    - sync/.github/workflows/tag-and-release.yaml
+    deleted:
+    - ''
+    added:
+    - ''
+    moved:
+    - ''
+  related-issue:
+    number: 740
+    repo_url: https://github.com/NRLMMD-GEOIPS/geoips
