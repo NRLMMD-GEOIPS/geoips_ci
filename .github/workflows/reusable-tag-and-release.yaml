@@ -63,7 +63,7 @@ jobs:
     permissions:
       contents: write
     needs: [check-release-branch, get-versions]
-    if: needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH == 'true'
+    if: needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH == 'true'
     steps:
       - name: Checkout current plugin current branch
         uses: actions/checkout@v4
@@ -84,7 +84,7 @@ jobs:
 
       - name: Push tags to branch
         run: |
-          git -C current_repo_current_branch push --set-upstream origin ${{ steps.new_branch_name.outputs.new_branch_name }} --tags
+          git -C current_repo_current_branch push --tags
 
       - name: Create Release!
         run: |
