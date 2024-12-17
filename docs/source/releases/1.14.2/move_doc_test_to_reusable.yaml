@@ -1,0 +1,17 @@
+actions:
+  - description: |
+      Move this from the geoips repo to make all workflows consistent.
+    files:
+      added:
+        - .github/workflows/reusable-doc-test.yaml
+        - sync/.github/workflows/doc-test.yaml
+    title: "Add reusable doc-test actions"
+  - description: |
+      Ensure all linting tasks run even if others fail.  This is to allow NOT
+      disabling a certain linter (ie, flake8), but still have it run as a
+      reminder that the repo needs to be updated... So we can see that all the
+      other linters ran successfully, even if a known linter fails.
+    files:
+      added:
+        - .github/workflows/reusable-lint.yaml
+    title: "Run all linters regardless of failure of others"

@@ -1,0 +1,134 @@
+bug fix:
+  - title: "Move all PR required workflows from locally defined to org rulesets"
+    description: |
+      Currently it appears that workflows can only be fully required prior to
+      merging PRs if they are defined within rulesets - they just report status
+      if they are locally defined but do not actually prevent merge.  Moving the
+      locally defined workflows to sync_external/.github/workflows (since external
+      organizations will not be able to use our org rulesets, so they would still
+      need access to these workflows), and set up org rulesets requiring those
+      workflows to pass.
+    files:
+      deleted:
+        - .github/workflows/doc-test.yaml
+        - .github/workflows/lint.yaml
+        - .github/workflows/proper-release-note-edits.yaml
+      moved:
+        - sync/.github/workflows/doc-test.yaml -> sync_external/.github/workflows/doc-test.yaml
+        - sync/.github/workflows/lint.yaml -> sync_external/.github/workflows/lint.yaml
+        - sync/.github/workflows/proper-release-note-edits.yaml -> sync_external/.github/workflows/proper-release-note-edits.yaml
+      added:
+        - ""
+      modified:
+        - ""
+    date:
+      start: 2024-11-20
+      finish: 2024-11-21
+enhancement:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+deprecation:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+removal:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+performance:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+documentation:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+continuous integration:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null

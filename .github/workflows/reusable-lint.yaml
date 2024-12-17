@@ -77,7 +77,6 @@ jobs:
       # reusable workflows.  Explicitly pass them in here to track what
       # variables we have available to this workflow.
       IS_VERSION_RELEASE_BRANCH: ${{ needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH }}
-      IS_FINAL_RELEASE_BRANCH: ${{ needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH }}
       CI_LINT_BANDIT: ${{ needs.get-job-flags.outputs.CI_LINT_BANDIT }}
       CI_LINT_DOC8: ${{ needs.get-job-flags.outputs.CI_LINT_DOC8 }}
       CI_LINT_FLAKE8: ${{ needs.get-job-flags.outputs.CI_LINT_FLAKE8 }}
@@ -113,10 +112,10 @@ jobs:
           echo $PWD
           ls -l $PWD/*
       - name: Install black
-        if: needs.get-job-flags.outputs.CI_LINT_BLACK == 'true'
+        if: ${{ needs.get-job-flags.outputs.CI_LINT_BLACK == 'true' }}
         run: pip install black
       - name: Run code check script black
-        if: needs.get-job-flags.outputs.CI_LINT_BLACK == 'true'
+        if: ${{ needs.get-job-flags.outputs.CI_LINT_BLACK == 'true' }}
         shell: bash -l {0}
         run: |
           echo "::group::black_analysis"
@@ -132,10 +131,14 @@ jobs:
             exit 1
           fi
       - name: Install doc8
-        if: needs.get-job-flags.outputs.CI_LINT_DOC8 == 'true'
+        # Always run doc8 if requested, whether other jobs succeeded or failed.
+        # Use ! cancelled so it will NOT run if the job was manually cancelled.
+        if: ${{ ! cancelled() && needs.get-job-flags.outputs.CI_LINT_DOC8 == 'true'}}
         run: pip install doc8
       - name: Run doc8
-        if: needs.get-job-flags.outputs.CI_LINT_DOC8 == 'true'
+        # Always run doc8 if requested, whether other jobs succeeded or failed.
+        # Use ! cancelled so it will NOT run if the job was manually cancelled.
+        if: ${{ ! cancelled() && needs.get-job-flags.outputs.CI_LINT_DOC8 == 'true'}}
         shell: bash -l {0}
         run: |
           echo "::group::doc8_analysis"
@@ -153,14 +156,24 @@ jobs:
             exit 1
           fi
       - name: Install flake8
-        if: needs.get-job-flags.outputs.CI_LINT_FLAKE8 == 'true'
+        # Always run flake8 if requested, whether other jobs succeeded or failed.
+        # Use ! cancelled so it will NOT run if the job was manually cancelled.
+        if: ${{ ! cancelled() && needs.get-job-flags.outputs.CI_LINT_FLAKE8 == 'true' }}
         run: pip install flake8
       - name: Install flake8-docstrings
+        # Always run flake8 if requested, whether other jobs succeeded or failed.
+        # Use ! cancelled so it will NOT run if the job was manually cancelled.
+        if: ${{ ! cancelled() && needs.get-job-flags.outputs.CI_LINT_FLAKE8 == 'true' }}
         run: pip install flake8-docstrings
       - name: Install flake8-rst-docstrings
+        # Always run flake8 if requested, whether other jobs succeeded or failed.
+        # Use ! cancelled so it will NOT run if the job was manually cancelled.
+        if: ${{ ! cancelled() && needs.get-job-flags.outputs.CI_LINT_FLAKE8 == 'true' }}
         run: pip install flake8-rst-docstrings
       - name: Run flake8
-        if: needs.get-job-flags.outputs.CI_LINT_FLAKE8 == 'true'
+        # Always run flake8 if requested, whether other jobs succeeded or failed.
+        # Use ! cancelled so it will NOT run if the job was manually cancelled.
+        if: ${{ ! cancelled() && needs.get-job-flags.outputs.CI_LINT_FLAKE8 == 'true' }}
         shell: bash -l {0}
         run: |
           echo "::group::flake8_analysis"
@@ -174,10 +187,14 @@ jobs:
             exit 1
           fi
       - name: Install bandit
-        if: needs.get-job-flags.outputs.CI_LINT_BANDIT == 'true'
+        # Always run bandit if requested, whether other jobs succeeded or failed.
+        # Use ! cancelled so it will NOT run if the job was manually cancelled.
+        if: ${{ ! cancelled() && needs.get-job-flags.outputs.CI_LINT_BANDIT == 'true' }}
         run: pip install bandit
       - name: Run bandit
-        if: needs.get-job-flags.outputs.CI_LINT_BANDIT == 'true'
+        # Always run bandit if requested, whether other jobs succeeded or failed.
+        # Use ! cancelled so it will NOT run if the job was manually cancelled.
+        if: ${{ ! cancelled() && needs.get-job-flags.outputs.CI_LINT_BANDIT == 'true' }}
         shell: bash -l {0}
         run: |
           echo "::group::bandit_analysis"

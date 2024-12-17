@@ -43,12 +43,15 @@ jobs:
       - name: Identify versions from GeoIPS default branch
         id: id_versions
         run: |
-          if [[ "${{ github.event.repository.name }}" == "geoips" ]]; then
-            version_path=./current_repo_current_branch/.github/versions
-          else
+          version_path=./current_repo_current_branch/.github/versions
+          # If the current repo does not have a .github/versions folder, then
+          # use the one from the geoips repo. This allows specifying versions separately
+          # for different repositories.
+          if [[ ! -d $version_path ]]; then
+            echo "Pulling versions out of GeoIPS repo version files"
             version_path=./geoips_repo_default_branch/.github/versions
           fi
-          echo "Pulling versions out of GeoIPS repo version files"
+          echo "Using version directory $version_path"
           echo "tagged_version=`cat ${version_path}/tagged_version`"
           echo "upcoming_version=`cat ${version_path}/upcoming_version`"
 

@@ -1,0 +1,131 @@
+bug fix:
+- title: Workflows used from organization wide repository rulesets MUST be in .github
+  description: |
+    Turns out you can't point to a workflow file in any directory in any repository -
+    it must be in the special .github folder.  So, keep doc-test, lint, and release
+    note edit workflows in sync_external for sharing with external users, but also
+    copy back into the geoips_ci .github/workflows folder.
+
+    Note these will all run twice on geoips_ci.
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - .github/workflows/doc-test.yaml
+    - .github/workflows/lint.yaml
+    - .github/workflows/proper-release-note-edits.yaml
+    modified:
+    - ''
+  date:
+    start: 2024-11-21
+    finish: 2024-11-21
+enhancement:
+- title: ''
+  description: ''
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - ''
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: null
+    finish: null
+deprecation:
+- title: ''
+  description: ''
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - ''
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: null
+    finish: null
+removal:
+- title: ''
+  description: ''
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - ''
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: null
+    finish: null
+performance:
+- title: ''
+  description: ''
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - ''
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: null
+    finish: null
+documentation:
+- title: ''
+  description: ''
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - ''
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: null
+    finish: null
+continuous integration:
+- title: ''
+  description: ''
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - ''
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: null
+    finish: null

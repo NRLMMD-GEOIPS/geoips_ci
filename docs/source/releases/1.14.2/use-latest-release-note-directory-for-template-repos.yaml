@@ -1,0 +1,135 @@
+bug fix:
+  - title: "Require latest release note directory during version release for template repos"
+    description: |
+      Template repositories do NOT move the 'latest' release note directory to 'X.Y.Z'
+      as plugin package repositories do - this is to ensure the template is indeed a
+      template without extra release notes, and with a valid first release note for the
+      initial commit in the latest folder.  We want the template repos as clean as
+      possible.
+
+      To achieve this, updated reusable-proper-release-note-edits.yaml to check that the
+      latest directory DOES exist and the X.Y.Z directory does NOT exist in order for the
+      release note check to pass on a version release branch specifically for the template
+      repos. Plugin package repo requirements unchanged.
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ".github/workflows/reusable-proper-release-note-edits.yaml"
+    related-issue:
+      internal: "GEOIPS/geoips#715 - 1.14.2 version release"
+    date:
+      start: 2024-11-22
+      finish: 2024-11-22
+enhancement:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+deprecation:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+removal:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+performance:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+documentation:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+continuous integration:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null

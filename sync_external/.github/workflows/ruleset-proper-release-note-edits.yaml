@@ -14,3 +14,5 @@ jobs:
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-proper-release-note-edits.yaml@main
     permissions:
       contents: read
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
