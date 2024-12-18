@@ -296,7 +296,7 @@ jobs:
           #   "html_only" to indicate producing only html output, and
           #   the path to the docs template directory in the geoips default branch.
           $BASE_GEOIPS_PATH/docs/build_docs.py \
-            --geoips-docs-path $GEOIPS_PATH/docs/ \
+            --geoips-docs-path $BASE_GEOIPS_PATH/docs/ \
             --force FORCE \
             --repo-path . \
             $run_on_package
