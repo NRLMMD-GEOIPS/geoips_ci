@@ -1,0 +1,13 @@
+actions:
+- title: Call build_docs.py directly from reusable-doc-test.yaml workflow
+  description: |
+    Rather than using the build_docs.sh wrapper from the CI, just compile
+    the build_docs.py call directly from the workflow.
+  files:
+    modified:
+    - geoips_ci/.github/workflows/reusable-doc-test.yaml
+  date:
+    start: 2024-12-18
+    finish: 2024-12-18
+  related-issue:
+    internal: GEOIPS#715 - 1.14.4 bug fixes
