@@ -295,7 +295,11 @@ jobs:
           #   the name of the current repo,
           #   "html_only" to indicate producing only html output, and
           #   the path to the docs template directory in the geoips default branch.
-          $BASE_GEOIPS_PATH/docs/build_docs.sh . $run_on_package html_only $BASE_GEOIPS_PATH/docs
+          $BASE_GEOIPS_PATH/docs/build_docs.py \
+            --geoips-docs-path $GEOIPS_PATH/docs/ \
+            --force FORCE \
+            --repo-path . \
+            $run_on_package
           ret=$?
           if [[ "${ret##*:}" != *"0"* ]]; then
             echo "::error::Building html docs ${ret##*:}"
