@@ -1,0 +1,97 @@
+enhancement:
+  - title: "Remove brassy-notes workflow which moved release notes from latest to TAGGED"
+    description: |
+      We now assume the latest directory has been moved to the tagged_version prior
+      to opening version-release branch, so there is a single merge / tag / release.
+
+      Remove workflow that moved release note directory and created a new branch/PR.
+
+      This originally started as applying brassy to create the final release note,
+      thus the brassy-notes name, but morphed to only moving the release note
+      directory.  Now we are further simplifying to ONLY tag/release on version-release
+      merge, and retaining YAML release notes as the "final" version.  RST release
+      notes are auto-generated every time - no RST release notes should be checked
+      into the repo at any time.  index.rst also auto-generated every time.
+
+      Tag and release now runs on version-release branch rather than final-release
+      branch.  Final release branch no longer required.
+    files:
+      deleted:
+        - "sync/.github/workflows/brassy-notes.yaml"
+        - ".github/workflows/brassy-notes.yaml"
+        - ".github/workflows/reusable-brassy-notes.yaml"
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ".github/workflows/reusable-tag-and-release.yaml"
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: "2024-11-16"
+      finish: "2024-11-16"
+  - title: "Enforce no latest and existing $VERS release note folder on release branch"
+    description: |
+      We now assume the latest dirextory has been moved to the tagged_version prior
+      to opening version-release branch, so there is a single merge / tag / release.
+
+      To ensure release notes are organized in the correct folder during a version
+      release, add a check to proper_release_note_check to ensure:
+
+      1. "latest" folder DOES NOT exist on a merge from *-version-release to default
+         branch
+      2. "$TAGGED_VERSION" folder DOES exist on a merge from *-version-release to
+         default branch.
+
+      This will make sure the tag and release goes smoothly when the version-release
+      branch is merged to the default branch.
+
+      NOTE: since we are using the geoips repo to pull the tagged version to determine
+      whether the correct folder exists, the proper release note edits workflow
+      now requires a token. This will require updating that workflow in every repo.
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ".github/workflows/reusable-proper-release-note-edits.yaml"
+        - ".github/workflows/proper-release-note-edits.yaml"
+        - "sync/.github/workflows/proper-release-note-edits.yaml"
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: "2024-11-16"
+      finish: "2024-11-16"
+  - title: "Remove all references to FINAL_RELEASE_BRANCH"
+    description: |
+      Since we have now removed the workflow that creates a FINAL_RELEASE_BRANCH
+      when VERSION_RELEASE_BRANCH is merged to the default branch, remove all
+      references to FINAL_RELEASE_BRANCH throughout the actions workflows.
+
+      We now assume the latest directory has been moved to the tagged_version prior
+      to opening version-release branch, so there is a single merge / tag / release.
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - .github/workflows/reusable-lint.yaml
+        - .github/workflows/reusable-print-variables.yaml
+        - .github/workflows/reusable-proper-release-note-edits.yaml
+        - .github/workflows/reusable-tag-and-release.yaml
+        - .github/workflows/reusable-check-release-branch.yaml
+    related-issue:
+      number: 715
+      internal: geoips
+    date:
+      start: "2024-11-16"
+      finish: "2024-11-16"

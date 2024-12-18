@@ -1,0 +1,412 @@
+name: Build docs and test
+
+on:
+  # Reusable workflow
+  workflow_call:
+    secrets:
+      token:
+        required: true
+      docker_token:
+        required: true
+
+# Assuming the below is in the workflow for an individual repository.
+# on:
+#   # Triggers the workflow when pull request created and updated
+#   pull_request:
+#   # Allows run of this workflow manually from the Actions tab
+#   workflow_dispatch:
+
+env:
+  # REQUIRED organization level variables used in this workflow.
+  #   ${{ github.event.repository.default_branch }} is used throughout
+  #     rather than main to generalize default branch
+  #     (removed DEFAULT_BRANCH org var)
+  #   DOCKER_REGISTRY: URL to the docker registry
+  #   DOCKER_REGISTRY_USER: user to sign into DOCKER_REGISTRY
+  #   DOCKER_REGISTRY_TOKEN: token for USER user to sign into DOCKER_REGISTRY
+  #   RUNNER: default runner
+  #   UPLOAD_GITHUB_ARTIFACTS: true/false, specify whether to upload artifacts to github
+  #   USE_DOCKER_BUILDX_ACTION: true/false, specify whether to use the docker buildx action
+
+  # OPTIONAL organization level variables:
+  #   # Some system implementations may require different runners for building and
+  #   # running docker containers - allow specifying separately. Defaults to vars.RUNNER
+  #   # if these are not defined. Note env context nor strings are supported in the
+  #   # runs-on field, so we MUST use the vars context for the default.
+  #   RUNNER_DOCKERBUILD: runner to build docker containers
+  #   RUNNER_DOCKERRUN: runner to run docker containers
+
+  # The path to the GeoIPS package in DOCLINTTEST images
+  BASE_GEOIPS_PATH: /packages/geoips
+  # Allow overriding the doclinttest image tag used for plugin packages
+  # Allows using a different version of the doc, lint, and test code
+  PLUGIN_DOCLINTTEST_TAG: doclinttest-stable
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Set variables that should be accessible to all jobs
+  get-job-flags:
+    runs-on: ${{ vars.RUNNER }}
+    env:
+      CURR_REPO: ${{ github.event.repository.name }}
+    outputs:
+      # The name of the untagged docker images to be created by this workflow
+      IMAGE_NAME: ${{ steps.set_image_name.outputs.IMAGE_NAME }}
+      REPO_NAME: ${{ steps.set_image_name.outputs.REPO_NAME }}
+      # The tag to use for the doclinttest images
+      DOCLINTTEST_TAG: ${{ steps.set_doclinttest_tag.outputs.DOCLINTTEST_TAG }}
+      # The image to use for doclinttest jobs
+      DOCLINTTEST_IMAGE: ${{ steps.set_doclinttest_image.outputs.DOCLINTTEST_IMAGE }}
+      # Flags for enabling/disabling various parts of the workflow
+      # Default to enabled unless overridden by a repository-level variable
+      CI_BUILD_SPHINX_HTML: ${{ steps.get_job_flags.outputs.CI_BUILD_SPHINX_HTML }}
+      CI_BUILD_SPHINX_PDF: ${{ steps.get_job_flags.outputs.CI_BUILD_SPHINX_PDF }}
+      CI_TEST_INTERFACES: ${{ steps.get_job_flags.outputs.CI_TEST_INTERFACES }}
+      CI_TEST_PYTEST_SHORT: ${{ steps.get_job_flags.outputs.CI_TEST_PYTEST_SHORT }}
+    steps:
+      - name: Set the image name
+        id: set_image_name
+        run: |
+          repo_name=$(echo ${{ github.repository }} | cut -d'/' -f2)
+          # Create an image name using the organiztion and repository names, lowercase
+          image_name=${{ vars.DOCKER_REGISTRY_USER }}/geoips
+          echo "REPO_NAME=${repo_name}"
+          echo "REPO_NAME=${repo_name}" >> ${GITHUB_ENV}
+          echo "REPO_NAME=${repo_name}" >> ${GITHUB_OUTPUT}
+          echo "IMAGE_NAME=${image_name}"
+          echo "IMAGE_NAME=${image_name}" >> ${GITHUB_ENV}
+          echo "IMAGE_NAME=${image_name}" >> ${GITHUB_OUTPUT}
+      - name: Set doclinttest image tag
+        id: set_doclinttest_tag
+        run: |
+          echo "CURR_REPO: ${CURR_REPO}"
+          # If the current repository is geoips, use the image we're about to build
+          # for running tests and building docs.
+          if [[ "${CURR_REPO}" == "geoips" ]]; then
+              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}"
+              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}" >> ${GITHUB_ENV}
+              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}" >> ${GITHUB_OUTPUT}
+          else
+              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}"
+              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}" >> ${GITHUB_ENV}
+              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}" >> ${GITHUB_OUTPUT}
+          fi
+      - name: Set doclinttest image
+        id: set_doclinttest_image
+        run: |
+          owner=${{ github.repository_owner }}
+          owner=${owner,,}
+          doclinttest_image_name=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}
+          echo "DOCLINTTEST_IMAGE=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}"
+          echo "DOCLINTTEST_IMAGE=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}" >> ${GITHUB_ENV}
+          echo "DOCLINTTEST_IMAGE=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}" >> ${GITHUB_OUTPUT}
+      - name: Get job flags
+        id: get_job_flags
+        run: |
+          # Define an array of flags and their corresponding secret values
+          flags=(CI_BUILD_SPHINX_HTML \
+                 CI_BUILD_SPHINX_PDF \
+                 CI_TEST_INTERFACES \
+                 CI_TEST_PYTEST_SHORT)
+          for flag in "${flags[@]}"; do
+              # Dynamically construct the variable name and access the corresponding secret
+              case $flag in
+                  CI_BUILD_SPHINX_HTML) val="${{ vars.CI_BUILD_SPHINX_HTML }}" ;;
+                  CI_BUILD_SPHINX_PDF) val="${{ vars.CI_BUILD_SPHINX_PDF }}" ;;
+                  CI_TEST_INTERFACES) val="${{ vars.CI_TEST_INTERFACES }}" ;;
+                  CI_TEST_PYTEST_SHORT) val="${{ vars.CI_TEST_PYTEST_SHORT }}" ;;
+              esac
+              # Check if the secret value is "true" and set the environment variable and output
+              if [ "$val" == "false" ]; then
+                  echo "${flag}=false"
+                  echo "${flag}=false" >> $GITHUB_ENV
+                  echo "${flag}=false" >> $GITHUB_OUTPUT
+              else
+                  echo "${flag}=true"
+                  echo "${flag}=true" >> $GITHUB_ENV
+                  echo "${flag}=true" >> $GITHUB_OUTPUT
+              fi
+          done
+
+  print-variables:
+    name: Print variables
+    needs: [get-job-flags]
+    # You do not appear to be able to use variables in this "uses" field.
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
+    with:
+      # These are outputs defined above.  Explicitly pass them in here to track
+      # what variables we have available to this workflow.
+      IMAGE_NAME: ${{ needs.get-job-flags.outputs.IMAGE_NAME }}
+      REPO_NAME: ${{ needs.get-job-flags.outputs.REPO_NAME }}
+      DOCLINTTEST_TAG: ${{ needs.get-job-flags.outputs.DOCLINTTEST_TAG }}
+      DOCLINTTEST_IMAGE: ${{ needs.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
+      CI_BUILD_SPHINX_HTML: ${{ needs.get-job-flags.outputs.CI_BUILD_SPHINX_HTML }}
+      CI_BUILD_SPHINX_PDF: ${{ needs.get-job-flags.outputs.CI_BUILD_SPHINX_PDF }}
+      CI_TEST_INTERFACES: ${{ needs.get-job-flags.outputs.CI_TEST_INTERFACES }}
+      CI_TEST_PYTEST_SHORT: ${{ needs.get-job-flags.outputs.CI_TEST_PYTEST_SHORT }}
+
+  # Build the base GeoIPS doclinttest image
+  # This image is used in all subsequent tests
+  # It is only built for the main GeoIPS package but is used by all repositories
+  #
+  # Within this image, the GeoIPS package is located in /packages/geoips and is
+  # installed using `pip install .[doc,lint,test]`. Scripts from geoips can be called
+  # from /packages/geoips.
+  build_doclinttest_image:
+    runs-on: ${{ vars.RUNNER_DOCKERBUILD || vars.RUNNER }}
+    needs: get-job-flags
+    if: >
+      ! cancelled() &&
+      vars.USE_CONDA_FOR_ACTIONS != 'true' &&
+      github.event.repository.name == 'geoips'
+    env:
+      IMAGE_NAME: ${{ needs.get-job-flags.outputs.IMAGE_NAME }}
+      BUILDCACHE_IMAGE: ${{ needs.get-job-flags.outputs.IMAGE_NAME }}:buildcache
+      DOCLINTTEST_IMAGE: ${{ needs.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
+    # Can't write to registry without this
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup BuildX
+        if: ${{ vars.USE_DOCKER_BUILDX_ACTION == 'true' }}
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to the Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.DOCKER_REGISTRY }}
+          username: ${{ vars.DOCKER_REGISTRY_USER }}
+          password: ${{ secrets.docker_token }}
+
+      # This cache allows the second push below when on the default branch
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Create tags
+        run: |
+          tags="${DOCLINTTEST_IMAGE},${BUILDCACHE_IMAGE}"
+          echo "GITHUB REF: ${GITHUB_REF}"
+          echo "Default Branch: refs/heads/${{ github.event.repository.default_branch }}"
+          echo "runner os: ${{ runner.os }}"
+          echo "github sha: ${{ github.sha }}"
+          echo "build cache image: ${{ env.BUILDCACHE_IMAGE }}"
+          if [[ "${GITHUB_REF}" == "refs/heads/${{ github.event.repository.default_branch }}" ]]; then
+            stableorlatest_image="${IMAGE_NAME}:doclinttest-stable"
+            tags="${tags},${stableorlatest_image}"
+          else
+            stableorlatest_image="${IMAGE_NAME}:doclinttest-latest"
+            tags="${tags},${stableorlatest_image}"
+          fi
+          # PUSH_TAGS is used with the docker buildx action
+          echo "PUSH_TAGS=${tags}"
+          echo "PUSH_TAGS=${tags}" >> $GITHUB_ENV
+          # STABLEORLATEST_IMAGE is only used with the explicit docker build command.
+          # It is the full path to the stable or latest image tag.
+          # The explicit docker build command requires pushing each image separately
+          # to the registry - so we need to track the stable/latest tag in addition
+          # to the DOCLINTTEST_IMAGE and BUILDCACHE_IMAGE tags
+          echo "STABLEORLATEST_IMAGE=${stableorlatest_image}"
+          echo "STABLEORLATEST_IMAGE=${stableorlatest_image}" >> $GITHUB_ENV
+
+      # If using docker buildx was requested via organization variable,
+      # DO NOT run this section.
+      - name: Build and push docker image with explicit docker build
+        if: ${{ vars.USE_DOCKER_BUILDX_ACTION == 'false' }}
+        # > makes newlines into spaces, so single command on multiple lines.
+        run: >
+          which docker;
+          docker build
+          --file Dockerfile
+          --tag ${DOCLINTTEST_IMAGE}
+          --tag ${BUILDCACHE_IMAGE}
+          --tag ${STABLEORLATEST_IMAGE}
+          --target doclinttest
+          .;
+          docker push ${BUILDCACHE_IMAGE};
+          docker push ${DOCLINTTEST_IMAGE};
+          docker push ${STABLEORLATEST_IMAGE};
+      - name: Build and push docker image with docker buildx action
+        if: ${{ vars.USE_DOCKER_BUILDX_ACTION == 'true' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: doclinttest
+          push: true
+          tags: ${{ env.PUSH_TAGS }}
+          file: "Dockerfile"
+          cache-from: type=registry,ref=${{ env.BUILDCACHE_IMAGE }}
+          cache-to: type=registry,ref=${{ vars.DOCKER_REGISTRY }}/${{ env.BUILDCACHE_IMAGE }},mode=max
+
+  #################################################
+  # Documentation builds - requires pip installed geoips, so use container
+  #################################################
+  docker_build_sphinx_html:
+    if: >
+      ! cancelled() &&
+      vars.USE_CONDA_FOR_ACTIONS != 'true' &&
+      needs.get-job-flags.outputs.CI_BUILD_SPHINX_HTML == 'true' &&
+      (needs.build_doclinttest_image.result == 'success' ||
+      needs.build_doclinttest_image.result == 'skipped')
+    runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
+    needs: [build_doclinttest_image, get-job-flags]
+    container:
+      image: ${{ needs.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
+      credentials:
+        username: ${{ vars.DOCKER_REGISTRY_USER }}
+        password: ${{ secrets.docker_token }}
+    env:
+      CURR_REPO: ${{ github.event.repository.name }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory $PWD
+
+      - name: Install package
+        run: pip install .
+
+      - name: Run build html
+        id: build-html-docs
+        run: |
+          # If we are specifically "template_basic_plugin" repo, then we must use
+          # my_package as the package name.  Otherwise the package name matches
+          # the plugin name.
+          run_on_package=$CURR_REPO
+          if [[ "$CURR_REPO" == "template_basic_plugin" ]]; then
+            run_on_package=my_package
+          fi
+          echo "Build html docs"
+          # Call build_docs.sh from the geoips default branch
+          # Pass in
+          #   the path to the current plugin repo,
+          #   the name of the current repo,
+          #   "html_only" to indicate producing only html output, and
+          #   the path to the docs template directory in the geoips default branch.
+          $BASE_GEOIPS_PATH/docs/build_docs.sh . $run_on_package html_only $BASE_GEOIPS_PATH/docs
+          ret=$?
+          if [[ "${ret##*:}" != *"0"* ]]; then
+            echo "::error::Building html docs ${ret##*:}"
+            exit 1
+          fi
+          echo "BUILT_DOCS_PATH=$PWD/build/sphinx/html" >> $GITHUB_OUTPUT
+      - name: Upload HTML Docs
+        if: ${{ vars.UPLOAD_GITHUB_ARTIFACTS == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: HTML Docs
+          path: ${{ steps.build-html-docs.outputs.BUILT_DOCS_PATH }}
+          if-no-files-found: error
+
+  #################################################
+  # Code tests - requires pip installed geoips, so use container
+  #################################################
+  docker_test_interfaces:
+    if: >
+      ! cancelled() &&
+      vars.USE_CONDA_FOR_ACTIONS != 'true' &&
+      needs.get-job-flags.outputs.CI_TEST_INTERFACES == 'true' &&
+      (needs.build_doclinttest_image.result == 'success' ||
+      needs.build_doclinttest_image.result == 'skipped')
+    runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
+    needs: [build_doclinttest_image, get-job-flags]
+    container:
+      image: ${{ needs.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
+      credentials:
+        username: ${{ vars.DOCKER_REGISTRY_USER }}
+        password: ${{ secrets.docker_token }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory $PWD
+      - name: Pip install package
+        run: pip install -v .
+      - name: create_plugin_registries
+        run: create_plugin_registries
+      - name: Run code check script interfaces
+        run: |
+          $BASE_GEOIPS_PATH/tests/utils/check_code.sh interfaces geoips
+          ret=$?
+          echo "::group::interface_analysis"
+          echo "INTERFACES analysis of code"
+          echo "${ret}"
+          echo "::endgroup::"
+          if [[ "${ret##*:}" != *"0"* ]]; then
+            echo "::error::due to interface violations ${ret##*:}"
+            exit 1
+          fi
+
+  docker_test_pytest_short:
+    if: >
+      ! cancelled() &&
+      vars.USE_CONDA_FOR_ACTIONS != 'true' &&
+      needs.get-job-flags.outputs.CI_TEST_PYTEST_SHORT == 'true' &&
+      (needs.build_doclinttest_image.result == 'success' ||
+      needs.build_doclinttest_image.result == 'skipped')
+    runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
+    needs: [build_doclinttest_image, get-job-flags]
+    container:
+      image: ${{ needs.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
+      credentials:
+        username: ${{ vars.DOCKER_REGISTRY_USER }}
+        password: ${{ secrets.docker_token }}
+    env:
+      CURR_REPO: ${{ github.event.repository.name }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory $PWD
+      - name: Pip install package
+        run: pip install -v .
+      - name: create_plugin_registries
+        run: create_plugin_registries
+      # Run unit tests for this repo if they exist
+      - name: Run pytest unit tests
+        run: |
+          echo "::group::pytest_unit_test"
+          echo "Pytest short unit tests of ${CURR_REPO}"
+          echo "which pytest"
+          which pytest
+          if [ ! -d "./tests/unit_tests" ]; then
+            echo "No unit tests found in ${CURR_REPO}"
+            exit 0
+          fi
+          echo "pytest -q ./tests/unit_tests"
+          pytest -q ./tests/unit_tests
+          ret=$?
+          echo "Return code: ${ret}"
+          echo "::endgroup::"
+          if [[ "${ret}" != *"0"* ]]; then
+            echo "::error::due to geoips repo pytest errors, return code ${ret}"
+            exit 1
+          fi
+      - name: Run base GeoIPS pytest unit tests
+        if: ${{ env.CURR_REPO != 'geoips' }}
+        run: |
+          echo "::group::pytest_unit_test"
+          echo "Pytest short unit tests of ${CURR_REPO} using core GeoIPS tests"
+          echo "which pytest"
+          which pytest
+          echo "pytest -q $BASE_GEOIPS_PATH/tests/unit_tests"
+          pytest -q $BASE_GEOIPS_PATH/tests/unit_tests
+          ret=$?
+          echo "Return code: ${ret}"
+          echo "::endgroup::"
+          if [[ "${ret}" != *"0"* ]]; then
+            echo "::error::due to geoips repo pytest errors, return code ${ret}"
+            exit 1
+          fi

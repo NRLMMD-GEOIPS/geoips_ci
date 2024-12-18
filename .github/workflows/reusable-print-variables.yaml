@@ -6,9 +6,6 @@ on:
       IS_VERSION_RELEASE_BRANCH:
         type: string
         required: false
-      IS_FINAL_RELEASE_BRANCH:
-        type: string
-        required: false
       TAGGED_VERSION:
         type: string
         required: false
@@ -28,6 +25,30 @@ on:
         type: string
         required: false
       CI_LINT_BLACK:
+        type: string
+        required: false
+      CI_BUILD_SPHINX_HTML:
+        type: string
+        required: false
+      CI_BUILD_SPHINX_PDF:
+        type: string
+        required: false
+      CI_TEST_INTERFACES:
+        type: string
+        required: false
+      CI_TEST_PYTEST_SHORT:
+        type: string
+        required: false
+      IMAGE_NAME:
+        type: string
+        required: false
+      REPO_NAME:
+        type: string
+        required: false
+      DOCLINTTEST_TAG:
+        type: string
+        required: false
+      DOCLINTTEST_IMAGE:
         type: string
         required: false
 
@@ -53,22 +74,34 @@ jobs:
           echo "github.run_attempt ${{ github.run_attempt }}"
           echo "vars.USE_CONDA_FOR_ACTIONS ${{ vars.USE_CONDA_FOR_ACTIONS }}"
           echo ""
-          echo "Input variables:"
+          echo "Input variables"
+          echo "---------------"
+          echo ""
+          echo "Release flags:"
           echo "version release branch: ${{ inputs.IS_VERSION_RELEASE_BRANCH }}"
-          echo "final release branch: ${{ inputs.IS_FINAL_RELEASE_BRANCH }}"
           echo "tagged version (after release): ${{ inputs.TAGGED_VERSION }}"
           echo "upcoming version (after release): ${{ inputs.UPCOMING_VERSION }}"
-          echo ""
-          echo "Github context:"
-          echo "$GITHUB_CONTEXT"
-          echo ${{ github.context }}
+          echo "CHECK_NEW_RELEASE_NOTE: ${{ inputs.CHECK_NEW_RELEASE_NOTE }}"
           echo ""
           echo "CI flags:"
           echo "CI_LINT_BANDIT: ${{ inputs.CI_LINT_BANDIT }}"
           echo "CI_LINT_DOC8: ${{ inputs.CI_LINT_DOC8 }}"
           echo "CI_LINT_FLAKE8: ${{ inputs.CI_LINT_FLAKE8 }}"
           echo "CI_LINT_BLACK: ${{ inputs.CI_LINT_BLACK }}"
-          echo "CHECK_NEW_RELEASE_NOTE: ${{ inputs.CHECK_NEW_RELEASE_NOTE }}"
+          echo "CI_BUILD_SPHINX_HTML: ${{ inputs.CI_BUILD_SPHINX_HTML }}"
+          echo "CI_BUILD_SPHINX_PDF: ${{ inputs.CI_BUILD_SPHINX_PDF }}"
+          echo "CI_TEST_INTERFACES: ${{ inputs.CI_TEST_INTERFACES }}"
+          echo "CI_TEST_PYTEST_SHORT: ${{ inputs.CI_TEST_PYTEST_SHORT }}"
+          echo ""
+          echo "Docker flags:"
+          echo "IMAGE_NAME: ${{ inputs.IMAGE_NAME }}"
+          echo "REPO_NAME: ${{ inputs.REPO_NAME }}"
+          echo "DOCLINTTEST_TAG: ${{ inputs.DOCLINTTEST_TAG }}"
+          echo "DOCLINTTEST_IMAGE: ${{ inputs.DOCLINTTEST_IMAGE }}"
+          echo ""
+          echo "Github context:"
+          echo "$GITHUB_CONTEXT"
+          echo ${{ github.context }}
 
           # for var in $(echo '${{ toJson(needs.set-variables.outputs) }}' | jq -r 'keys[]'); do
           if [[ "${{ inputs.FLAGS }}" != "" ]]; then

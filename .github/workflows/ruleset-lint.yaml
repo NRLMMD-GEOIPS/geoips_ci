@@ -1,6 +1,6 @@
-name: Note edits
+name: Lint
 
-# We only need to check status of release notes from pull requests.
+# Only run linting on pull requests
 on:
   # Triggers the workflow when pull request created and updated
   pull_request:
@@ -8,9 +8,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  note-edits:
-    name: Note edits
+  lint:
+    name: Lint
     # You do not appear to be able to use variables in the "uses" field.
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-proper-release-note-edits.yaml@main
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-lint.yaml@main
+    if: "!contains(github.event.repository.name, 'test_data_')"
     permissions:
       contents: read
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}

@@ -33,9 +33,6 @@ GitHub Actions:
     - ''
     moved:
     - ''
-  related-issue:
-    number: 562
-    repo_url: GEOIPS/geoips
 - title: 'Create directory of files to sync to all plugin repositories'
   description: |
     *From GEOIPS#562: 2024-09-24, 1.14.1 updates*
@@ -61,6 +58,3 @@ GitHub Actions:
     - sync/.github/workflows/package-and-publish.yaml
     - sync/.github/workflows/proper-release-note-edits.yaml
     - sync/.github/workflows/tag-and-release.yaml
-  related-issue:
-    number: 562
-    repo_url: 'GEOIPS/geoips'

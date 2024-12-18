@@ -1,16 +1,13 @@
 name: Tag/release
 
-# 1. Brassy - on PR merge of v*-version-release
-#    * move YAML release notes to correct version directories
-#    * commit and push to v*-finalize-release-notes
-#    * open PR to default branch
-# 2. Tag and Release - on PR merge of v*-finalize-release-notes
+# 1. Tag and Release - on PR merge of v*-version-release
 #    * Tag current version
 #    * Release just tagged version
-# 3. Package and Publish - on published release (from #2)
+#    * Expects latest release note folder moved to X.Y.Z
+# 2. Package and Publish - on published release (from #2)
 #    * Build wheel
 #    * Publish to pypi
-# 4. Deploy docs - on published release (from #2)
+# 3. Deploy docs - on published release (from #2)
 #    * pip install geoips
 #    * pip install plugin repo
 #    * build docs with geoips/docs/build_docs.sh
@@ -53,7 +50,6 @@ jobs:
       # reusable workflows.  Explicitly pass them in here to track what
       # variables we have available to this workflow.
       IS_VERSION_RELEASE_BRANCH: ${{ needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH }}
-      IS_FINAL_RELEASE_BRANCH: ${{ needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH }}
       TAGGED_VERSION: ${{ needs.get-versions.outputs.TAGGED_VERSION }}
       UPCOMING_VERSION: ${{ needs.get-versions.outputs.UPCOMING_VERSION }}
 

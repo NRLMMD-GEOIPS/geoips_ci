@@ -1,16 +1,12 @@
 name: Deploy docs
 
-# 1. Brassy - on PR merge of v*-version-release
-#    * move YAML release notes to correct version directories
-#    * commit and push to v*-finalize-release-notes
-#    * open PR to default branch
-# 2. Tag and Release - on PR merge of v*-finalize-release-notes
+# 1. Tag and Release - on PR merge of v*-version-release
 #    * Tag current version
 #    * Release just tagged version
-# 3. Package and Publish - on published release (from #2)
+# 2. Package and Publish - on published release (from #1)
 #    * Build wheel
 #    * Publish to pypi
-# 4. Deploy docs - on published release (from #2)
+# 3. Deploy docs - on published release (from #1)
 #    * pip install geoips
 #    * pip install plugin repo
 #    * build docs with geoips/docs/build_docs.sh
@@ -46,7 +42,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4 # v4is the latest for setup-python
         with:
-          python-version: "pypy-3.10"  # I believe 3.10 is the latest for actions
+          python-version: "pypy-3.10" # I believe 3.10 is the latest for actions
           check-latest: true
       - name: Update pip
         run: pip install --upgrade pip

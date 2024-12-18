@@ -3,6 +3,9 @@ name: Check release notes for proper edits
 on:
   # Reusable workflow
   workflow_call:
+    secrets:
+      token:
+        required: true
 
 # Assuming this trigger is contained in individual plugin repository workflows.
 # # We only need to check status of release notes from pull requests.
@@ -24,6 +27,14 @@ jobs:
   check-release-branch:
     name: Check release branch
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-check-release-branch.yaml@main
+
+  get-versions:
+    name: Get versions
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-get-versions.yaml@main
+    permissions:
+      contents: read
+    secrets:
+      token: ${{ secrets.token }}
 
   # Set variables that should be accessible to all jobs
   get-job-flags:
@@ -62,8 +73,9 @@ jobs:
       # reusable workflows.  Explicitly pass them in here to track what
       # variables we have available to this workflow.
       IS_VERSION_RELEASE_BRANCH: ${{ needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH }}
-      IS_FINAL_RELEASE_BRANCH: ${{ needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH }}
       CHECK_NEW_RELEASE_NOTE: ${{ needs.get-job-flags.outputs.CHECK_NEW_RELEASE_NOTE }}
+      TAGGED_VERSION: ${{ needs.get-versions.outputs.TAGGED_VERSION }}
+      UPCOMING_VERSION: ${{ needs.get-versions.outputs.UPCOMING_VERSION }}
 
   #################################################
   # OLD Release Note NOT Added
@@ -72,7 +84,7 @@ jobs:
     if: >
       always() &&
       needs.get-job-flags.outputs.CHECK_NEW_RELEASE_NOTE == 'true'
-    needs: [check-release-branch, get-job-flags]
+    needs: [check-release-branch, get-job-flags, get-versions]
     # This can run on the "standard" runner, no specific settings required.
     runs-on: ${{ vars.RUNNER }}
     steps:
@@ -119,11 +131,10 @@ jobs:
         # release notes, so there is no requirement to manually update.
         if: >
           github.ref_name != github.event.repository.default_branch &&
-          needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH != 'true'
+          needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH != 'true'
         run: |
           echo "Checking for new and modified YAML release note files in $PWD"
-          echo "final release branch needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH "
-          echo ${{ needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH }}
+          echo ${{ needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH }}
           #update_this_file="$(cat update_this_release_note)"
           release_notes_dir="$PWD/current_repo_current_branch/docs/source/releases/latest" #/$(dirname $update_this_file)"
           ls $release_notes_dir
@@ -137,7 +148,7 @@ jobs:
           git -C $PWD/current_repo_current_branch fetch
           # If this is the final release branch, then we are just moving release notes,
           # note modifying.  In that case, allow renamed as well as added or modified.
-          if [[ ${{ needs.check-release-branch.outputs.IS_FINAL_RELEASE_BRANCH == 'true' }} ]]; then
+          if [[ ${{ needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH == 'true' }} ]]; then
             echo "git -C ./current_repo_current_branch diff --name-only --diff-filter=RAM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml"
             ret=$(git -C ./current_repo_current_branch diff --name-only --diff-filter=RAM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml)
           else
@@ -154,4 +165,78 @@ jobs:
               exit 1
           else
               echo "PASSED"
+          fi
+      - name: Check version release YAML release note files
+        if: >
+          needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH == 'true'
+        run: |
+          vers=${{ needs.get-versions.outputs.TAGGED_VERSION }}
+          reldir=./current_repo_current_branch/docs/source/releases/$vers
+          latestdir=./current_repo_current_branch/docs/source/releases/latest
+          reponame=${{ github.event.repository.name }}
+          if [[ "$reponame" != "template_"* && ! -d $reldir ]]; then
+            echo "FAILED: Non-template repo does not have the $vers directory, and is a release branch"
+            echo "Please move latest directory to $vers"
+            exit 1
+          elif [[ "$reponame" != "template_"* && -d $latestdir ]]; then
+            echo "FAILED: latest directory still exists in non-template repo, and is a release branch"
+            echo "Please move latest directory to $vers"
+            exit 1
+          elif [[ "$reponame" == "template_"* && -d $reldir ]]; then
+            echo "FAILED: Template repo DOES have the $vers directory"
+            echo "Template repos should always retain the 'latest' folder, please move '$vers' back to 'latest'"
+            exit 1
+          elif [[ "$reponame" == "template_"* && ! -d $latestdir ]]; then
+            echo "FAILED: latest directory DOES NOT exist in template repo, and is a release branch"
+            echo "Template repos should always retain the 'latest' folder, please move '$vers' back to 'latest'"
+            exit 1
+          else
+            echo "PASSED"
+          fi
+      - name: Install brassy and pink
+        if: >
+          ! cancelled()
+        run: pip install brassy; pip install pink
+      - name: Run brassy and pink on release branch
+        if: >
+          ! cancelled() &&
+          needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH == 'true'
+        shell: bash -l {0}
+        run: |
+          echo "::group::run_brassy_release_branch"
+          echo "Apply brassy to final release notes"
+          reponame=${{ github.event.repository.name }}
+          if [[ "$reponame" == "template_"* ]]; then
+            echo "Using 'latest' release note directory for template repo"
+            release_dir=latest
+          else
+            release_dir=${{ needs.get-versions.outputs.TAGGED_VERSION }}
+            echo "Using '$release_dir' release note directory for non-template repo"
+          fi
+          touch test.rst
+          brassy --no-rich --output-file test.rst ./current_repo_current_branch/docs/source/releases/$release_dir/*
+          ret=$?
+          echo "Return code: ${ret}"
+          echo "::endgroup::"
+          if [[ "${ret}" != *"0"* ]]; then
+            echo "::error::due to brassy violations, return code ${ret}"
+            exit 1
+          fi
+      - name: Run brassy and pink on non-release branch
+        if: >
+          ! cancelled() &&
+          needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH != 'true'
+        shell: bash -l {0}
+        run: |
+          echo "::group::run_brassy_nonrelease_branch"
+          echo "Apply brassy to final release notes"
+          release_dir=latest
+          touch test.rst
+          brassy --no-rich --output-file test.rst ./current_repo_current_branch/docs/source/releases/$release_dir/*
+          ret=$?
+          echo "Return code: ${ret}"
+          echo "::endgroup::"
+          if [[ "${ret}" != *"0"* ]]; then
+            echo "::error::due to brassy violations, return code ${ret}"
+            exit 1
           fi

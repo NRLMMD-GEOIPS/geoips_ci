@@ -1,0 +1,14 @@
+enhancement:
+  - title: "Use .github/versions/ folder if it exists, else geoips repo versions"
+    description: |
+      Rather than only supporting using versions from geoips/.github/versions folder,
+      add support for using locally defined versions in the current repo, and falling
+      back on geoips repo versions if local version doesn't exist.
+    files:
+      modified:
+        - ".github/workflows/reusable-get-versions.yaml"
+    related-issue:
+      internal: GEOIPS#715 - 1.14.2 version release
+    date:
+      start: 2024-11-20
+      finish: 2024-11-20

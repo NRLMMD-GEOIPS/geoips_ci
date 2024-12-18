@@ -1,0 +1,117 @@
+enhancement:
+  - title: "Run brassy in proper-release-note-edits workflow"
+    description: |
+      To ensure release notes are properly formatted,
+      run brassy from within proper-release-note-edits
+      YAML workflow.  Since this now requires cloning the
+      geoips repo to identify the currently tagged version
+      for release branch checks, must also now pass token
+      to workflow. This will require updating the YAML workflow
+      in all repos that use this reusable workflow.
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ".github/workflows/reusable-proper-release-note-edits.yaml"
+        - ".github/workflows/proper-release-note-edits.yaml"
+        - "sync/.github/workflows/proper-release-note-edits.yaml"
+    related-issue:
+      number: 715
+      repo_url: ""
+    date:
+      start: "2024-11-16"
+      finish: "2024-11-16"
+deprecation:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+removal:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+performance:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+documentation:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
+continuous integration:
+  - title: ""
+    description: ""
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: null
+      finish: null
