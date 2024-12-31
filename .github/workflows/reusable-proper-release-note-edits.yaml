@@ -107,8 +107,8 @@ jobs:
           fi
           echo "git -C $PWD/current_repo_current_branch fetch"
           git -C $PWD/current_repo_current_branch fetch
-          echo "git -C $PWD/current_repo_current_branch diff --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst"
-          ret=$(git -C $PWD/current_repo_current_branch diff --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst)
+          echo "git -C $PWD/current_repo_current_branch diff --ignore-space-at-eol --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst"
+          ret=$(git -C $PWD/current_repo_current_branch diff --ignore-space-at-eol --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst)
           for file in ${ret[@]}; do
               echo "    $file"
           done
@@ -149,11 +149,11 @@ jobs:
           # If this is the final release branch, then we are just moving release notes,
           # note modifying.  In that case, allow renamed as well as added or modified.
           if [[ ${{ needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH == 'true' }} ]]; then
-            echo "git -C ./current_repo_current_branch diff --name-only --diff-filter=RAM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml"
-            ret=$(git -C ./current_repo_current_branch diff --name-only --diff-filter=RAM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml)
+            echo "git -C ./current_repo_current_branch diff --ignore-space-at-eol --name-only --diff-filter=RAM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml"
+            ret=$(git -C ./current_repo_current_branch diff --ignore-space-at-eol --name-only --diff-filter=RAM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml)
           else
-            echo "git -C ./current_repo_current_branch diff --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml"
-            ret=$(git -C ./current_repo_current_branch diff --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml)
+            echo "git -C ./current_repo_current_branch diff --ignore-space-at-eol --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml"
+            ret=$(git -C ./current_repo_current_branch diff --ignore-space-at-eol --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml)
           fi
           echo "Release note files modified this PR:"
           for file in ${ret[@]}; do
