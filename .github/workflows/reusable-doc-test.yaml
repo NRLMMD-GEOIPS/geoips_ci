@@ -297,7 +297,7 @@ jobs:
           #   the path to the docs template directory in the geoips default branch.
           python3 $BASE_GEOIPS_PATH/docs/build_docs.py \
             --geoips-docs-path $BASE_GEOIPS_PATH/docs/ \
-            --force FORCE \
+            --force \
             --repo-path . \
             $run_on_package
           ret=$?

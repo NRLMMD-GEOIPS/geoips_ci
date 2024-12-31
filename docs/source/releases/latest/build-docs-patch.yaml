@@ -1,0 +1,13 @@
+actions:
+- title: Call build_docs.py with corrected arguments
+  description: |
+    Change from using hotfix --force FORCE to just using correct --force now that build_docs.py has been fixed on GeoIPS core.
+  files:
+    modified:
+    - geoips_ci/.github/workflows/reusable-doc-test.yaml
+  date:
+    start: 2024-12-20
+    finish: 2024-12-20
+  related-issue:
+    number: 0
+    repo_url: ""
