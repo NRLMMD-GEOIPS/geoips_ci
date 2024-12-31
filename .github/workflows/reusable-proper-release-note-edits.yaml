@@ -107,8 +107,8 @@ jobs:
           fi
           echo "git -C $PWD/current_repo_current_branch fetch"
           git -C $PWD/current_repo_current_branch fetch
-          echo "git -C $PWD/current_repo_current_branch diff --ignore-space-at-eol --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst"
-          ret=$(git -C $PWD/current_repo_current_branch diff --ignore-space-at-eol --name-only --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst)
+          echo "git -C $PWD/current_repo_current_branch diff --ignore-space-at-eol --stat --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst"
+          ret=$(git -C $PWD/current_repo_current_branch diff --ignore-space-at-eol --stat --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst)
           for file in ${ret[@]}; do
               echo "    $file"
           done
