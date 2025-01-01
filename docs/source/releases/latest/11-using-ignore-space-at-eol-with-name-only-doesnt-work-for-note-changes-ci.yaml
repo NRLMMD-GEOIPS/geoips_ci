@@ -1,0 +1,14 @@
+actions:
+- title: Ignore RST Whitespace Fix
+  description: |
+    Ignores whitespace changes at the end of lines in rst release files correctly
+    by not using --name-only and using --stat instead
+  files:
+    modified:
+    - .github/workflows/reusable-proper-release-note-edits.yaml
+  date:
+    start: 2024-12-31
+    finish: 2024-12-31
+  related-issue:
+    number: 11
+    repo_url: ""
