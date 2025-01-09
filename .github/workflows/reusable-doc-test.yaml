@@ -66,8 +66,8 @@ jobs:
               fi
           done
 
-  print-variables:
-    name: Print variables
+  print-doc-test-variables:
+    name: Print doc-test variables
     needs: [get-job-flags]
     # You do not appear to be able to use variables in this "uses" field.
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
