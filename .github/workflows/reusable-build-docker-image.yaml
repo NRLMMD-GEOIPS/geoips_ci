@@ -101,8 +101,8 @@ jobs:
           echo "DOCLINTTEST_IMAGE=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}" >> ${GITHUB_ENV}
           echo "DOCLINTTEST_IMAGE=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}" >> ${GITHUB_OUTPUT}
 
-  print-variables:
-    name: Print variables
+  print-build-image-variables:
+    name: Print build image variables
     needs: [get-job-flags]
     # You do not appear to be able to use variables in this "uses" field.
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
