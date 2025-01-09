@@ -32,6 +32,9 @@ jobs:
   # Within this image, the GeoIPS package is located in /packages/geoips and is
   # installed using `pip install .[doc,lint,test]`. Scripts from geoips can be called
   # from /packages/geoips.
+  #
+  # Note the DOCKER_IMAGE_NAME is returned from reusable-build-docker-image
+  # by including it in the "outputs" listed at the top of the workflow.
   get-doclinttest-image:
     name: Get docker image
     # You do not appear to be able to use variables in this "uses" field.
@@ -56,6 +59,8 @@ jobs:
       CI_BUILD_SPHINX_PDF: ${{ steps.get_job_flags.outputs.CI_BUILD_SPHINX_PDF }}
       CI_TEST_INTERFACES: ${{ steps.get_job_flags.outputs.CI_TEST_INTERFACES }}
       CI_TEST_PYTEST_SHORT: ${{ steps.get_job_flags.outputs.CI_TEST_PYTEST_SHORT }}
+      # DOCKER_IMAGE_NAME is defined in the "outputs" section at the top of
+      # reusable-build-docker-image
       DOCKER_IMAGE_NAME: ${{ needs.get-doclinttest-image.outputs.DOCKER_IMAGE_NAME }}
     steps:
       - name: Get job flags
