@@ -25,9 +25,29 @@ defaults:
     shell: bash
 
 jobs:
+  # Build the base GeoIPS doclinttest image
+  # This image is used in all subsequent tests
+  # It is only built for the main GeoIPS package but is used by all repositories
+  #
+  # Within this image, the GeoIPS package is located in /packages/geoips and is
+  # installed using `pip install .[doc,lint,test]`. Scripts from geoips can be called
+  # from /packages/geoips.
+  get-doclinttest-image:
+    name: Get docker image
+    needs: [get-job-flags]
+    # You do not appear to be able to use variables in this "uses" field.
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-build-docker-image.yaml@build_stable_image_on_tag
+    secrets:
+      token: ${{ secrets.token }}
+      docker_token: ${{ secrets.docker_token }}
+    permissions:
+      packages: write
+      contents: write
+
   # Set variables that should be accessible to all jobs
   get-job-flags:
     runs-on: ${{ vars.RUNNER }}
+    needs: [get-doclinttest-image]
     env:
       CURR_REPO: ${{ github.event.repository.name }}
     outputs:
@@ -37,6 +57,7 @@ jobs:
       CI_BUILD_SPHINX_PDF: ${{ steps.get_job_flags.outputs.CI_BUILD_SPHINX_PDF }}
       CI_TEST_INTERFACES: ${{ steps.get_job_flags.outputs.CI_TEST_INTERFACES }}
       CI_TEST_PYTEST_SHORT: ${{ steps.get_job_flags.outputs.CI_TEST_PYTEST_SHORT }}
+      DOCKER_IMAGE_NAME: ${{ needs.get-doclinttest-image.outputs.DOCKER_IMAGE_NAME }}
     steps:
       - name: Get job flags
         id: get_job_flags
@@ -65,6 +86,9 @@ jobs:
                   echo "${flag}=true" >> $GITHUB_OUTPUT
               fi
           done
+          echo "DOCKER_IMAGE_NAME=${DOCKER_IMAGE_NAME}"
+          echo "DOCKER_IMAGE_NAME=${DOCKER_IMAGE_NAME}" >> ${GITHUB_ENV}
+          echo "DOCKER_IMAGE_NAME=${DOCKER_IMAGE_NAME}" >> ${GITHUB_OUTPUT}
 
   print-doc-test-variables:
     name: Print doc-test variables
@@ -79,25 +103,6 @@ jobs:
       CI_TEST_INTERFACES: ${{ needs.get-job-flags.outputs.CI_TEST_INTERFACES }}
       CI_TEST_PYTEST_SHORT: ${{ needs.get-job-flags.outputs.CI_TEST_PYTEST_SHORT }}
 
-  # Build the base GeoIPS doclinttest image
-  # This image is used in all subsequent tests
-  # It is only built for the main GeoIPS package but is used by all repositories
-  #
-  # Within this image, the GeoIPS package is located in /packages/geoips and is
-  # installed using `pip install .[doc,lint,test]`. Scripts from geoips can be called
-  # from /packages/geoips.
-  get_doclinttest_image:
-    name: Get docker image
-    needs: [get-job-flags]
-    # You do not appear to be able to use variables in this "uses" field.
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-build-docker-image.yaml@build_stable_image_on_tag
-    secrets:
-      token: ${{ secrets.token }}
-      docker_token: ${{ secrets.docker_token }}
-    permissions:
-      packages: write
-      contents: write
-
   #################################################
   # Documentation builds - requires pip installed geoips, so use container
   #################################################
@@ -106,12 +111,12 @@ jobs:
       ! cancelled() &&
       vars.USE_CONDA_FOR_ACTIONS != 'true' &&
       needs.get-job-flags.outputs.CI_BUILD_SPHINX_HTML == 'true' &&
-      (needs.get_doclinttest_image.result == 'success' ||
-      needs.get_doclinttest_image.result == 'skipped')
+      (needs.get-doclinttest-image.result == 'success' ||
+      needs.get-doclinttest-image.result == 'skipped')
     runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
-    needs: [get_doclinttest_image, get-job-flags]
+    needs: [get-doclinttest-image, get-job-flags]
     container:
-      image: ${{ needs.get_doclinttest_image.outputs.DOCKER_IMAGE_NAME }}
+      image: ${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}
       credentials:
         username: ${{ vars.DOCKER_REGISTRY_USER }}
         password: ${{ secrets.docker_token }}
@@ -133,7 +138,7 @@ jobs:
           # If we are specifically "template_basic_plugin" repo, then we must use
           # my_package as the package name.  Otherwise the package name matches
           # the plugin name.
-          echo "${{ needs.get_doclinttest_image.outputs.DOCKER_IMAGE_NAME }}"
+          echo "${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}"
           run_on_package=$CURR_REPO
           if [[ "$CURR_REPO" == "template_basic_plugin" ]]; then
             run_on_package=my_package
@@ -172,12 +177,12 @@ jobs:
       ! cancelled() &&
       vars.USE_CONDA_FOR_ACTIONS != 'true' &&
       needs.get-job-flags.outputs.CI_TEST_INTERFACES == 'true' &&
-      (needs.get_doclinttest_image.result == 'success' ||
-      needs.get_doclinttest_image.result == 'skipped')
+      (needs.get-doclinttest-image.result == 'success' ||
+      needs.get-doclinttest-image.result == 'skipped')
     runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
-    needs: [get_doclinttest_image, get-job-flags]
+    needs: [get-doclinttest-image, get-job-flags]
     container:
-      image: ${{ needs.get_doclinttest_image.outputs.DOCKER_IMAGE_NAME }}
+      image: ${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}
       credentials:
         username: ${{ vars.DOCKER_REGISTRY_USER }}
         password: ${{ secrets.docker_token }}
@@ -208,12 +213,12 @@ jobs:
       ! cancelled() &&
       vars.USE_CONDA_FOR_ACTIONS != 'true' &&
       needs.get-job-flags.outputs.CI_TEST_PYTEST_SHORT == 'true' &&
-      (needs.get_doclinttest_image.result == 'success' ||
-      needs.get_doclinttest_image.result == 'skipped')
+      (needs.get-doclinttest-image.result == 'success' ||
+      needs.get-doclinttest-image.result == 'skipped')
     runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
-    needs: [get_doclinttest_image, get-job-flags]
+    needs: [get-doclinttest-image, get-job-flags]
     container:
-      image: ${{ needs.get_doclinttest_image.outputs.DOCKER_IMAGE_NAME }}
+      image: ${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}
       credentials:
         username: ${{ vars.DOCKER_REGISTRY_USER }}
         password: ${{ secrets.docker_token }}
