@@ -111,7 +111,7 @@ jobs:
     runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
     needs: [get_doclinttest_image, get-job-flags]
     container:
-      image: ${{ needs.get_doclinttest_image.outputs.DOCLINTTEST_IMAGE }}
+      image: ${{ needs.get_doclinttest_image.outputs.DOCKER_IMAGE_NAME }}
       credentials:
         username: ${{ vars.DOCKER_REGISTRY_USER }}
         password: ${{ secrets.docker_token }}
@@ -133,7 +133,7 @@ jobs:
           # If we are specifically "template_basic_plugin" repo, then we must use
           # my_package as the package name.  Otherwise the package name matches
           # the plugin name.
-          echo "${{ needs.get_doclinttest_image.outputs.DOCLINTTEST_IMAGE }}"
+          echo "${{ needs.get_doclinttest_image.outputs.DOCKER_IMAGE_NAME }}"
           run_on_package=$CURR_REPO
           if [[ "$CURR_REPO" == "template_basic_plugin" ]]; then
             run_on_package=my_package
@@ -177,7 +177,7 @@ jobs:
     runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
     needs: [get_doclinttest_image, get-job-flags]
     container:
-      image: ${{ needs.get_doclinttest_image.outputs.DOCLINTTEST_IMAGE }}
+      image: ${{ needs.get_doclinttest_image.outputs.DOCKER_IMAGE_NAME }}
       credentials:
         username: ${{ vars.DOCKER_REGISTRY_USER }}
         password: ${{ secrets.docker_token }}
@@ -213,7 +213,7 @@ jobs:
     runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
     needs: [get_doclinttest_image, get-job-flags]
     container:
-      image: ${{ needs.get_doclinttest_image.outputs.DOCLINTTEST_IMAGE }}
+      image: ${{ needs.get_doclinttest_image.outputs.DOCKER_IMAGE_NAME }}
       credentials:
         username: ${{ vars.DOCKER_REGISTRY_USER }}
         password: ${{ secrets.docker_token }}
