@@ -34,7 +34,6 @@ jobs:
   # from /packages/geoips.
   get-doclinttest-image:
     name: Get docker image
-    needs: [get-job-flags]
     # You do not appear to be able to use variables in this "uses" field.
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-build-docker-image.yaml@build_stable_image_on_tag
     secrets:
