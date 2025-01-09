@@ -86,8 +86,8 @@ jobs:
   # Within this image, the GeoIPS package is located in /packages/geoips and is
   # installed using `pip install .[doc,lint,test]`. Scripts from geoips can be called
   # from /packages/geoips.
-  build_doclinttest_image:
-    name: Build docker image
+  get_doclinttest_image:
+    name: Get docker image
     # You do not appear to be able to use variables in this "uses" field.
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-build-docker-image.yaml@build_stable_image_on_tag
     secrets:
@@ -105,12 +105,12 @@ jobs:
       ! cancelled() &&
       vars.USE_CONDA_FOR_ACTIONS != 'true' &&
       needs.get-job-flags.outputs.CI_BUILD_SPHINX_HTML == 'true' &&
-      (needs.build_doclinttest_image.result == 'success' ||
-      needs.build_doclinttest_image.result == 'skipped')
+      (needs.get_doclinttest_image.result == 'success' ||
+      needs.get_doclinttest_image.result == 'skipped')
     runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
-    needs: [build_doclinttest_image, get-job-flags]
+    needs: [get_doclinttest_image, get-job-flags]
     container:
-      image: ${{ needs.build_doclinttest_image.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
+      image: ${{ needs.get_doclinttest_image.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
       credentials:
         username: ${{ vars.DOCKER_REGISTRY_USER }}
         password: ${{ secrets.docker_token }}
@@ -170,12 +170,12 @@ jobs:
       ! cancelled() &&
       vars.USE_CONDA_FOR_ACTIONS != 'true' &&
       needs.get-job-flags.outputs.CI_TEST_INTERFACES == 'true' &&
-      (needs.build_doclinttest_image.result == 'success' ||
-      needs.build_doclinttest_image.result == 'skipped')
+      (needs.get_doclinttest_image.result == 'success' ||
+      needs.get_doclinttest_image.result == 'skipped')
     runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
-    needs: [build_doclinttest_image, get-job-flags]
+    needs: [get_doclinttest_image, get-job-flags]
     container:
-      image: ${{ needs.build_doclinttest_image.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
+      image: ${{ needs.get_doclinttest_image.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
       credentials:
         username: ${{ vars.DOCKER_REGISTRY_USER }}
         password: ${{ secrets.docker_token }}
@@ -206,12 +206,12 @@ jobs:
       ! cancelled() &&
       vars.USE_CONDA_FOR_ACTIONS != 'true' &&
       needs.get-job-flags.outputs.CI_TEST_PYTEST_SHORT == 'true' &&
-      (needs.build_doclinttest_image.result == 'success' ||
-      needs.build_doclinttest_image.result == 'skipped')
+      (needs.get_doclinttest_image.result == 'success' ||
+      needs.get_doclinttest_image.result == 'skipped')
     runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
-    needs: [build_doclinttest_image, get-job-flags]
+    needs: [get_doclinttest_image, get-job-flags]
     container:
-      image: ${{ needs.build_doclinttest_image.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
+      image: ${{ needs.get_doclinttest_image.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
       credentials:
         username: ${{ vars.DOCKER_REGISTRY_USER }}
         password: ${{ secrets.docker_token }}
