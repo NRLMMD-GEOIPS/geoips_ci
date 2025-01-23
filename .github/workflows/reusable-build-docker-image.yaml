@@ -220,6 +220,8 @@ jobs:
           docker push ${STABLEORLATEST_IMAGE};
       - name: Build and push docker image with docker buildx action
         if: ${{ vars.USE_DOCKER_BUILDX_ACTION == 'true' }}
+        # References the below commit, which matched both v6 and v6.12.0 at the time
+        # of this writing.
         # https://github.com/docker/build-push-action/commit/67a2d409c0a876cbe6b11854e3e25193efe4e62d
         uses: docker/build-push-action@67a2d409c0a876cbe6b11854e3e25193efe4e62d # v6 / v6.12.0
         with:
