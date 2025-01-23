@@ -2,7 +2,7 @@ bug fix:
 - title: 'Install geoips in editable mode (hotfix for failing integration tests)'
   description: 'Fixes failing unit tests that should be passing by reverting to previous behaviour and installing GeoIPS in editable mode.'
   files:
-  modified:
+    modified:
     - '.github/workflows/reusable-doc-test.yaml'
   related-issue:
     number: 875
