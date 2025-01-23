@@ -1,0 +1,11 @@
+bug fix:
+- title: 'Install geoips in editable mode (hotfix for failing integration tests)'
+  description: 'Fixes failing unit tests that should be passing by reverting to previous behaviour and installing GeoIPS in editable mode.'
+  files:
+    - '.github/workflows/reusable-doc-test.yaml'
+  related-issue:
+    number: 875
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips/'
+  date:
+    start: Jan 22 2025
+    finish: Jan 23 2025
