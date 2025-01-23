@@ -337,7 +337,7 @@ jobs:
       - name: Configure Git safe directory
         run: git config --global --add safe.directory $PWD
       - name: Pip install package
-        run: pip install -v .
+        run: pip install -v -e .
       - name: create_plugin_registries
         run: create_plugin_registries
       - name: Run code check script interfaces
@@ -375,7 +375,7 @@ jobs:
       - name: Configure Git safe directory
         run: git config --global --add safe.directory $PWD
       - name: Pip install package
-        run: pip install -v .
+        run: pip install -v -e .
       - name: create_plugin_registries
         run: create_plugin_registries
       # Run unit tests for this repo if they exist
