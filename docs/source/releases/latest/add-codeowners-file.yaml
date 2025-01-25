@@ -1,0 +1,17 @@
+continuous integration:
+  - title: "Add CODEOWNERS file."
+    description: |
+      Enforces review from codeowners
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - .github/CODEOWNERS
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: "Jan 09 2025"
+      finish: "Jan 09 2025"

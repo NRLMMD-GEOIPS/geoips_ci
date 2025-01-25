@@ -1,0 +1,234 @@
+name: Build docker image
+
+on:
+  # Reusable workflow
+  workflow_call:
+    secrets:
+      token:
+        required: true
+      docker_token:
+        required: true
+    outputs:
+      DOCKER_IMAGE_NAME:
+        description: "Name of docker image to be used"
+        value: ${{ jobs.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
+
+# Assuming the below is in the workflow for an individual repository.
+# on:
+#   # triggers the workflow on published release
+#   release:
+#     types:
+#       - published
+#   # allows run of this workflow manually from the actions tab
+#   # must be merged to default before it will be available to manually run.
+#   workflow_dispatch:
+
+env:
+  # REQUIRED organization level variables used in this workflow.
+  #   ${{ github.event.repository.default_branch }} is used throughout
+  #     rather than main to generalize default branch
+  #     (removed DEFAULT_BRANCH org var)
+  #   DOCKER_REGISTRY: URL to the docker registry
+  #   DOCKER_REGISTRY_USER: user to sign into DOCKER_REGISTRY
+  #   DOCKER_REGISTRY_TOKEN: token for USER user to sign into DOCKER_REGISTRY
+  #   RUNNER: default runner
+  #   UPLOAD_GITHUB_ARTIFACTS: true/false, specify whether to upload artifacts to github
+  #   USE_DOCKER_BUILDX_ACTION: true/false, specify whether to use the docker buildx action
+
+  # OPTIONAL organization level variables:
+  #   # Some system implementations may require different runners for building and
+  #   # running docker containers - allow specifying separately. Defaults to vars.RUNNER
+  #   # if these are not defined. Note env context nor strings are supported in the
+  #   # runs-on field, so we MUST use the vars context for the default.
+  #   RUNNER_DOCKERBUILD: runner to build docker containers
+  #   RUNNER_DOCKERRUN: runner to run docker containers
+
+  # The path to the GeoIPS package in DOCLINTTEST images
+  BASE_GEOIPS_PATH: /packages/geoips
+  # Allow overriding the doclinttest image tag used for plugin packages
+  # Allows using a different version of the doc, lint, and test code
+  PLUGIN_DOCLINTTEST_TAG: doclinttest-stable
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # Set variables that should be accessible to all jobs
+  get-job-flags:
+    runs-on: ${{ vars.RUNNER }}
+    env:
+      CURR_REPO: ${{ github.event.repository.name }}
+    outputs:
+      # The name of the untagged docker images to be created by this workflow
+      IMAGE_NAME: ${{ steps.set_image_name.outputs.IMAGE_NAME }}
+      REPO_NAME: ${{ steps.set_image_name.outputs.REPO_NAME }}
+      # The tag to use for the doclinttest images
+      DOCLINTTEST_TAG: ${{ steps.set_doclinttest_tag.outputs.DOCLINTTEST_TAG }}
+      # The image to use for doclinttest jobs
+      DOCLINTTEST_IMAGE: ${{ steps.set_doclinttest_image.outputs.DOCLINTTEST_IMAGE }}
+    steps:
+      - name: Set the image name
+        id: set_image_name
+        run: |
+          repo_name=$(echo ${{ github.repository }} | cut -d'/' -f2)
+          # Create an image name using the organiztion and repository names, lowercase
+          image_name=${{ vars.DOCKER_REGISTRY_USER }}/geoips
+          echo "REPO_NAME=${repo_name}"
+          echo "REPO_NAME=${repo_name}" >> ${GITHUB_ENV}
+          echo "REPO_NAME=${repo_name}" >> ${GITHUB_OUTPUT}
+          echo "IMAGE_NAME=${image_name}"
+          echo "IMAGE_NAME=${image_name}" >> ${GITHUB_ENV}
+          echo "IMAGE_NAME=${image_name}" >> ${GITHUB_OUTPUT}
+      - name: Set doclinttest image tag
+        id: set_doclinttest_tag
+        run: |
+          echo "CURR_REPO: ${CURR_REPO}"
+          # If the current repository is geoips, use the image we're about to build
+          # for running tests and building docs.
+          if [[ "${CURR_REPO}" == "geoips" ]]; then
+              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}"
+              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}" >> ${GITHUB_ENV}
+              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}" >> ${GITHUB_OUTPUT}
+          else
+              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}"
+              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}" >> ${GITHUB_ENV}
+              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}" >> ${GITHUB_OUTPUT}
+          fi
+      - name: Set doclinttest image
+        id: set_doclinttest_image
+        run: |
+          owner=${{ github.repository_owner }}
+          owner=${owner,,}
+          doclinttest_image_name=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}
+          echo "DOCLINTTEST_IMAGE=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}"
+          echo "DOCLINTTEST_IMAGE=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}" >> ${GITHUB_ENV}
+          echo "DOCLINTTEST_IMAGE=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}" >> ${GITHUB_OUTPUT}
+
+  print-build-image-variables:
+    name: Print build image variables
+    needs: [get-job-flags]
+    # You do not appear to be able to use variables in this "uses" field.
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
+    with:
+      # These are outputs defined above.  Explicitly pass them in here to track
+      # what variables we have available to this workflow.
+      IMAGE_NAME: ${{ needs.get-job-flags.outputs.IMAGE_NAME }}
+      REPO_NAME: ${{ needs.get-job-flags.outputs.REPO_NAME }}
+      DOCLINTTEST_TAG: ${{ needs.get-job-flags.outputs.DOCLINTTEST_TAG }}
+      DOCLINTTEST_IMAGE: ${{ needs.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
+
+  # Build the base GeoIPS doclinttest image
+  # This image is used in all subsequent tests
+  # It is only built for the main GeoIPS package but is used by all repositories
+  #
+  # Within this image, the GeoIPS package is located in /packages/geoips and is
+  # installed using `pip install .[doc,lint,test]`. Scripts from geoips can be called
+  # from /packages/geoips.
+  build_doclinttest_image:
+    runs-on: ${{ vars.RUNNER_DOCKERBUILD || vars.RUNNER }}
+    needs: get-job-flags
+    if: >
+      ! cancelled() &&
+      vars.USE_CONDA_FOR_ACTIONS != 'true' &&
+      github.event.repository.name == 'geoips'
+    env:
+      IMAGE_NAME: ${{ needs.get-job-flags.outputs.IMAGE_NAME }}
+      BUILDCACHE_IMAGE: ${{ needs.get-job-flags.outputs.IMAGE_NAME }}:buildcache
+      DOCLINTTEST_IMAGE: ${{ needs.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
+    # Can't write to registry without this
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup BuildX
+        if: ${{ vars.USE_DOCKER_BUILDX_ACTION == 'true' }}
+        # References the below commit, which matched both v3 and v3.8.0 at the time
+        # of this writing.
+        # https://github.com/docker/setup-buildx-action/commit/6524bf65af31da8d45b59e8c27de4bd072b392f5
+        uses: docker/setup-buildx-action@6524bf65af31da8d45b59e8c27de4bd072b392f5 # v3 / v3.8.0
+
+      - name: Login to the Registry
+        # References the below commit, which matched both v3 and v3.3.0 at the time
+        # of this writing.
+        # https://github.com/docker/login-action/commit/9780b0c442fbb1117ed29e0efdff1e18412f7567
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3 / v3.3.0
+        with:
+          registry: ${{ vars.DOCKER_REGISTRY }}
+          username: ${{ vars.DOCKER_REGISTRY_USER }}
+          password: ${{ secrets.docker_token }}
+
+      # This cache allows the second push below when on the default branch
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Create tags
+        run: |
+          tags="${DOCLINTTEST_IMAGE},${BUILDCACHE_IMAGE}"
+          echo "GITHUB REF: ${GITHUB_REF}"
+          echo "Default Branch: refs/heads/${{ github.event.repository.default_branch }}"
+          echo "runner os: ${{ runner.os }}"
+          echo "github sha: ${{ github.sha }}"
+          echo "build cache image: ${{ env.BUILDCACHE_IMAGE }}"
+          # Create stable image on default branch
+          if [[ "${GITHUB_REF}" == "refs/heads/${{ github.event.repository.default_branch }}" ]]; then
+            stableorlatest_image="${IMAGE_NAME}:doclinttest-stable"
+            tags="${tags},${stableorlatest_image}"
+          # Also create stable image on tag
+          elif [[ "${GITHUB_REF}" == "refs/tags/"* ]]; then
+            stableorlatest_image="${IMAGE_NAME}:doclinttest-stable"
+            tags="${tags},${stableorlatest_image}"
+          else
+            stableorlatest_image="${IMAGE_NAME}:doclinttest-latest"
+            tags="${tags},${stableorlatest_image}"
+          fi
+          # PUSH_TAGS is used with the docker buildx action
+          echo "PUSH_TAGS=${tags}"
+          echo "PUSH_TAGS=${tags}" >> $GITHUB_ENV
+          # STABLEORLATEST_IMAGE is only used with the explicit docker build command.
+          # It is the full path to the stable or latest image tag.
+          # The explicit docker build command requires pushing each image separately
+          # to the registry - so we need to track the stable/latest tag in addition
+          # to the DOCLINTTEST_IMAGE and BUILDCACHE_IMAGE tags
+          echo "STABLEORLATEST_IMAGE=${stableorlatest_image}"
+          echo "STABLEORLATEST_IMAGE=${stableorlatest_image}" >> $GITHUB_ENV
+
+      # If using docker buildx was requested via organization variable,
+      # DO NOT run this section.
+      - name: Build and push docker image with explicit docker build
+        if: ${{ vars.USE_DOCKER_BUILDX_ACTION == 'false' }}
+        # > makes newlines into spaces, so single command on multiple lines.
+        run: >
+          which docker;
+          docker build
+          --file Dockerfile
+          --tag ${DOCLINTTEST_IMAGE}
+          --tag ${BUILDCACHE_IMAGE}
+          --tag ${STABLEORLATEST_IMAGE}
+          --target doclinttest
+          .;
+          docker push ${BUILDCACHE_IMAGE};
+          docker push ${DOCLINTTEST_IMAGE};
+          docker push ${STABLEORLATEST_IMAGE};
+      - name: Build and push docker image with docker buildx action
+        if: ${{ vars.USE_DOCKER_BUILDX_ACTION == 'true' }}
+        # References the below commit, which matched both v6 and v6.12.0 at the time
+        # of this writing.
+        # https://github.com/docker/build-push-action/commit/67a2d409c0a876cbe6b11854e3e25193efe4e62d
+        uses: docker/build-push-action@67a2d409c0a876cbe6b11854e3e25193efe4e62d # v6 / v6.12.0
+        with:
+          context: .
+          target: doclinttest
+          push: true
+          tags: ${{ env.PUSH_TAGS }}
+          file: "Dockerfile"
+          cache-from: type=registry,ref=${{ env.BUILDCACHE_IMAGE }}
+          cache-to: type=registry,ref=${{ vars.DOCKER_REGISTRY }}/${{ env.BUILDCACHE_IMAGE }},mode=max
