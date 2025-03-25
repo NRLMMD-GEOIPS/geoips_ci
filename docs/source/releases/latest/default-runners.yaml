@@ -1,0 +1,18 @@
+continuous integration:
+  - title: "Set default runners if environmental variable not set."
+    description: |
+      Not having a default runner presents problems when users attempt to use these workflows outside of the NRLMMD environment. 
+      This updates them to default to ubuntu-latest if an environment variable is not set.
+    files:
+      modified:
+        - .github/workflows/reusable-check-release-branch.yaml
+        - .github/workflows/reusable-deploy-docs.yaml
+        - .github/workflows/reusable-lint.yaml
+        - .github/workflows/reusable-print-variables.yaml
+        - .github/workflows/reusable-proper-release-note-edits.yaml
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: "March 25 2025"
+      finish: "March 25 2025"
