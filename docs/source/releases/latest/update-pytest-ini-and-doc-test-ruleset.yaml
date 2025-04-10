@@ -1,0 +1,19 @@
+Github Actions:
+- title: Update to latest pytest.ini
+  description: |
+    Including new pytest-based integration test markers
+  files:
+    modified:
+    - sync/pytest.ini
+  date:
+    start: 2025-03-27
+    finish: 2025-03-27
+- title: Skip non-pip installable repos on doc-test rulesets
+  description: |
+    Do not attempt to run doc-test ruleset on non-pip installable repos.
+  files:
+    modified:
+    - .github/workflows/ruleset-doc-test.yaml
+  date:
+    start: 2025-03-27
+    finish: 2025-03-27

@@ -113,7 +113,6 @@ jobs:
   docker_build_sphinx_html:
     if: >
       ! cancelled() &&
-      vars.USE_CONDA_FOR_ACTIONS != 'true' &&
       needs.get-job-flags.outputs.CI_BUILD_SPHINX_HTML == 'true' &&
       (needs.get-doclinttest-image.result == 'success' ||
       needs.get-doclinttest-image.result == 'skipped')
@@ -121,9 +120,6 @@ jobs:
     needs: [get-doclinttest-image, get-job-flags]
     container:
       image: ${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}
-      credentials:
-        username: ${{ vars.DOCKER_REGISTRY_USER }}
-        password: ${{ secrets.docker_token }}
     env:
       CURR_REPO: ${{ github.event.repository.name }}
     steps:
@@ -179,7 +175,6 @@ jobs:
   docker_test_interfaces:
     if: >
       ! cancelled() &&
-      vars.USE_CONDA_FOR_ACTIONS != 'true' &&
       needs.get-job-flags.outputs.CI_TEST_INTERFACES == 'true' &&
       (needs.get-doclinttest-image.result == 'success' ||
       needs.get-doclinttest-image.result == 'skipped')
@@ -187,9 +182,6 @@ jobs:
     needs: [get-doclinttest-image, get-job-flags]
     container:
       image: ${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}
-      credentials:
-        username: ${{ vars.DOCKER_REGISTRY_USER }}
-        password: ${{ secrets.docker_token }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -215,7 +207,6 @@ jobs:
   docker_test_pytest_short:
     if: >
       ! cancelled() &&
-      vars.USE_CONDA_FOR_ACTIONS != 'true' &&
       needs.get-job-flags.outputs.CI_TEST_PYTEST_SHORT == 'true' &&
       (needs.get-doclinttest-image.result == 'success' ||
       needs.get-doclinttest-image.result == 'skipped')
@@ -223,9 +214,6 @@ jobs:
     needs: [get-doclinttest-image, get-job-flags]
     container:
       image: ${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}
-      credentials:
-        username: ${{ vars.DOCKER_REGISTRY_USER }}
-        password: ${{ secrets.docker_token }}
     env:
       CURR_REPO: ${{ github.event.repository.name }}
     steps:
