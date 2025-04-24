@@ -78,18 +78,13 @@ jobs:
           IFS=$'\n'
   
           # 5. For each changed YAML file in 'latest', check if it has any of the required keys.
-          for file in ${CHANGED_FEATURE_FILES}; do
-            KEY_FOUND=false
-  
-            for key in "${KEYS[@]}"; do
-              # 'yq e ".<key>"' returns 'null' if the key is not present.
-              key_value=$(yq e ".${key}" "$file" 2>/dev/null || true)
-  
-              if [ "$key_value" != "null" ]; then
-                KEY_FOUND=true
-                break
-              fi
-            done
+          for key in "${KEYS[@]}"; do
+            key_value=$(yq e ".${key}" "$file" 2>/dev/null || true)
+            if [ -n "$key_value" ] && [ "$key_value" != "null" ]; then
+              KEY_FOUND=true
+              break
+            fi
+          done
   
             # 6. If a required key is found, ensure that some .rst doc changes were made.
             if [ "$KEY_FOUND" = true ]; then
