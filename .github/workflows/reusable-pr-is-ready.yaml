@@ -1,8 +1,13 @@
-name: "PR Complete"
+name: PR Complete
 
 on:
+  workflow_call:
   pull_request:
     types: [opened, edited, reopened, synchronize]
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   All_checkboxes_checked:
