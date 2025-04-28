@@ -52,7 +52,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y yq
-    
+
+      # This step checks if any modified release notes contain keys indicating a 
+      # feature, enhancement, or deprecation. 
+      # If such keys are found, it enforces that at least one documentation (.rst) file within the 
+      # docs/ directory must also be modified in the same pull request, failing the check otherwise.
+      # Aka.... if there is a new feature OR a deprecation the docs MUST be edited in some way.
       - name: Check release notes for feature changes, and then require docs updates if found
         run: |
           set -euo pipefail
