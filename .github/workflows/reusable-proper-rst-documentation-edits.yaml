@@ -29,11 +29,13 @@ jobs:
       # docs/ directory must also be modified in the same pull request, failing the check otherwise.
       # Aka.... if there is a new feature OR a deprecation the docs MUST be edited in some way.
       - name: Check release notes for feature changes, and then require docs updates if found
+        env:
+          commit_hash: ${{ github.event.pull_request.base.sha  }}
         run: |
           set -euo pipefail
-    
+          
           KEYS=("feature" "enhancement" "deprecation")
-          CHANGED_FILES=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD)
+          CHANGED_FILES=$(git diff --name-only "${{ env.commit_hash }}" HEAD)
           CHANGED_FEATURE_FILES=$(echo "${CHANGED_FILES}" | grep '^docs/source/releases/latest/.*\.yaml$' || true) # Get release note changes
           CHANGED_DOC_FILES=$(echo "${CHANGED_FILES}" | grep '^docs/.*\.rst$' || true) # Get changed rst files in docs
     
