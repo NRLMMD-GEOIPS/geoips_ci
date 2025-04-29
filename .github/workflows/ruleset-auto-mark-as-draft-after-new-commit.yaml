@@ -2,7 +2,7 @@ name: Auto PR Drafter
 
 on:
   pull_request:
-    types: [synchronize]
+#    types: [synchronize]
 
 jobs:
   handle-new-commits:
