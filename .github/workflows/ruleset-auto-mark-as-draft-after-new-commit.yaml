@@ -1,0 +1,26 @@
+name: Auto PR Drafter
+
+on:
+  pull_request:
+    types: [synchronize]
+
+jobs:
+  handle-new-commits:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if PR is not draft
+        id: check_pr_status
+        run: |
+          if [[ "${{ github.event.pull_request.draft }}" == "false" ]]; then
+            echo "is_draft=false" >> $GITHUB_OUTPUT
+          else
+            echo "is_draft=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Convert PR to draft
+        if: steps.check_pr_status.outputs.is_draft == 'false'
+        uses: https://github.com/NRLMMD-GEOIPS/geoips_ci/.github/workflows/change-pr-to-draft.yml@main
+        with:
+          pr_number: ${{ github.event.pull_request.number }}
+          skip_label_check: false
+          comment_on_pr: true
