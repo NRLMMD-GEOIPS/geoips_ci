@@ -19,7 +19,7 @@ jobs:
 
       - name: Convert PR to draft
         if: steps.check_pr_status.outputs.is_draft == 'false'
-        uses: https://github.com/NRLMMD-GEOIPS/geoips_ci/.github/workflows/change-pr-to-draft.yml@main
+        uses: https://github.com/NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-auto-convert-PR-to-draft.yaml@29-convert-prs-to-draft-after-every-commit-on-an-open-pr
         with:
           pr_number: ${{ github.event.pull_request.number }}
           skip_label_check: false
