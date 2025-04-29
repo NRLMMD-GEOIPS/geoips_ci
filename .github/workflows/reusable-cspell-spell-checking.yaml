@@ -6,7 +6,7 @@ on:
 
 jobs:
   spell-check:
-    name: Check spelling
+    name: Check spelling in changed files
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
