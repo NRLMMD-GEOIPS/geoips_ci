@@ -1,7 +1,7 @@
 name: Change PR to Draft
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       pr_number:
         description: 'PR Number to convert to draft'
@@ -17,7 +17,7 @@ on:
         required: false
         type: boolean
         default: true
-
+        
 jobs:
   change-to-draft:
     runs-on: ubuntu-latest
