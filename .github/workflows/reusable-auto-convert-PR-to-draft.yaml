@@ -1,0 +1,145 @@
+name: Change PR to Draft
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR Number to convert to draft'
+        required: true
+        type: string
+      skip_label_check:
+        description: 'Skip checking for exemption labels'
+        required: false
+        type: boolean
+        default: false
+      comment_on_pr:
+        description: 'Add a comment explaining the draft conversion'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  change-to-draft:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    
+    steps:
+      - name: Get PR information
+        id: pr_info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          echo "Fetching metadata for PR #${PR_NUMBER}..."
+          
+          # Check if PR exists and get its current status
+          PR_DATA=$(gh pr view ${PR_NUMBER} --json number,draft,author,url 2>&1)
+          if [[ $? -ne 0 ]]; then
+            echo "::error::Failed to fetch PR #${PR_NUMBER}: ${PR_DATA}"
+            echo "pr_exists=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          # Extract PR data from json response
+          IS_DRAFT=$(echo "$PR_DATA" | jq -r '.draft')
+          PR_AUTHOR=$(echo "$PR_DATA" | jq -r '.author.login')
+          PR_URL=$(echo "$PR_DATA" | jq -r '.url')
+          
+          echo "PR #${PR_NUMBER} found. Is draft: ${IS_DRAFT}"
+          echo "pr_exists=true" >> $GITHUB_OUTPUT
+          echo "is_draft=${IS_DRAFT}" >> $GITHUB_OUTPUT
+          echo "pr_author=${PR_AUTHOR}" >> $GITHUB_OUTPUT
+          echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Check if PR should be converted to draft
+        id: check_pr
+        if: steps.pr_info.outputs.pr_exists == 'true' && steps.pr_info.outputs.is_draft == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          SKIP_LABEL_CHECK: ${{ inputs.skip_label_check }}
+        run: |
+          # Skip label check if requested
+          if [[ "$SKIP_LABEL_CHECK" == "true" ]]; then
+            echo "Skipping exemption label check as requested"
+            echo "should_convert=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Check for labels that would exclude this PR from being converted to draft
+          echo "Checking PR #${PR_NUMBER} for exclusion labels..."
+          
+          # Use jq to check for specific labels
+          EXEMPT_LABEL=$(gh pr view ${PR_NUMBER} --json labels \
+            --jq '.labels | map(select(.name == "no-auto-draft")) | length')
+          
+          if [[ "$EXEMPT_LABEL" -gt 0 ]]; then
+            echo "Skipping draft conversion due to exemption label"
+            echo "should_convert=false" >> $GITHUB_OUTPUT
+          else
+            echo "No exemption labels found, will convert PR to draft"
+            echo "should_convert=true" >> $GITHUB_OUTPUT
+          fi
+        shell: bash
+
+      - name: Change PR to Draft
+        if: >-
+          steps.pr_info.outputs.pr_exists == 'true' && 
+          steps.pr_info.outputs.is_draft == 'false' && 
+          steps.check_pr.outputs.should_convert == 'true'
+        id: convert_to_draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          echo "Converting PR #${PR_NUMBER} to draft status..."
+          
+          # Attempt to convert PR to draft and capture output
+          OUTPUT=$(gh pr ready ${PR_NUMBER} --draft 2>&1)
+          EXIT_CODE=$?
+          
+          if [[ $EXIT_CODE -eq 0 ]]; then
+            echo "Successfully converted PR to draft status"
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Failed to convert PR to draft status: ${OUTPUT}"
+            echo "success=false" >> $GITHUB_OUTPUT
+            # Continue workflow instead of failing to allow comment step
+          fi
+        shell: bash
+
+      - name: Add Comment to PR
+        if: >-
+          inputs.comment_on_pr == true && 
+          steps.pr_info.outputs.pr_exists == 'true' && 
+          steps.convert_to_draft.outputs.success == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_AUTHOR: ${{ steps.pr_info.outputs.pr_author }}
+        run: |
+          # Add a helpful comment explaining why the PR was changed to draft
+          COMMENT="Hi @${PR_AUTHOR}, this PR has been automatically converted to draft status.
+          When you're ready for review again, please mark it as 'Ready for review'.
+          
+          If you want to prevent this behavior for this PR please add a `no-auto-draft` label to this PR.
+          *This is an automated action by a CI workflow.*"
+          
+          gh pr comment ${PR_NUMBER} --body "$COMMENT"
+        shell: bash
+
+      - name: Notify on conversion failure
+        if: >-
+          inputs.comment_on_pr == true && 
+          steps.pr_info.outputs.pr_exists == 'true' && 
+          steps.convert_to_draft.outputs.success == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          echo "⚠️ Draft Conversion Failed"
+          echo "The system attempted to convert this PR to draft status but encountered an error."
+          exit 1
+        shell: bash
