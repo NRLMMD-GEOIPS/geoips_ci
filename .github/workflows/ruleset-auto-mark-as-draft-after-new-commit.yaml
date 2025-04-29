@@ -2,7 +2,7 @@ name: Auto PR Drafter
 
 on:
   pull_request:
-#    types: [synchronize]
+    types: [opened, synchronize, reopened]
 
 jobs:
   handle-new-commits:
@@ -19,7 +19,7 @@ jobs:
 
       - name: Convert PR to draft
         if: steps.check_pr_status.outputs.is_draft == 'false'
-        uses: https://github.com/NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-auto-convert-PR-to-draft.yaml@29-convert-prs-to-draft-after-every-commit-on-an-open-pr
+        uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-auto-convert-PR-to-draft.yaml@29-convert-prs-to-draft-after-every-commit-on-an-open-pr
         with:
           pr_number: ${{ github.event.pull_request.number }}
           skip_label_check: false
