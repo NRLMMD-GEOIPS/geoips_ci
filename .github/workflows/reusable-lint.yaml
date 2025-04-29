@@ -1,6 +1,7 @@
 name: Run linters
 
 on:
+  pull_request:
   workflow_call:
     secrets:
       token:
@@ -57,17 +58,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          path: ./current_repo_current_branch
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Checkout geoips default branch
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           repository: ${{ vars.GEOIPS_ORGANIZATION }}/geoips
           ref: ${{ vars.GEOIPS_DEFAULT_BRANCH }}
-          token: ${{ secrets.token }}
           path: ./geoips_repo_default_branch
-          clean: true
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -78,7 +75,14 @@ jobs:
       - name: Run black
         run: |
           black --version
-          ./geoips_repo_default_branch/tests/utils/check_code.sh black ./current_repo_current_branch
+          ./geoips_repo_default_branch/tests/utils/check_code.sh black .
+      - name: Save linting results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: black-lint-results
+          path: black-lint-results.txt
+          retention-days: 1
 
   doc8-lint:
     runs-on: ${{ vars.RUNNER }}
@@ -88,8 +92,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          path: ./current_repo_current_branch
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -99,12 +102,19 @@ jobs:
         run: pip install doc8
       - name: Run doc8
         run: |
-          if [ -d "./current_repo_current_branch/docs/source/new-docs" ]; then
-            doc8 --max-line-length=120 ./current_repo_current_branch/docs/source/new-docs/
+          if [ -d "./docs/source/new-docs" ]; then
+            doc8 --max-line-length=120 ./docs/source/new-docs/
           else
             echo "No new-docs directory found"
             exit 0
           fi
+      - name: Save linting results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: doc8-lint-results
+          path: doc8-lint-results.txt
+          retention-days: 1
 
   flake8-lint:
     runs-on: ${{ vars.RUNNER }}
@@ -114,17 +124,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          path: ./current_repo_current_branch
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Checkout geoips default branch
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           repository: ${{ vars.GEOIPS_ORGANIZATION }}/geoips
           ref: ${{ vars.GEOIPS_DEFAULT_BRANCH }}
-          token: ${{ secrets.token }}
           path: ./geoips_repo_default_branch
-          clean: true
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -135,7 +141,14 @@ jobs:
           pip install flake8 flake8-docstrings flake8-rst-docstrings
       - name: Run flake8
         run: |
-          ./geoips_repo_default_branch/tests/utils/check_code.sh flake8 ./current_repo_current_branch
+          ./geoips_repo_default_branch/tests/utils/check_code.sh flake8 .
+      - name: Save linting results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flake8-lint-results
+          path: flake8-lint-results.txt
+          retention-days: 1
 
   bandit-lint:
     runs-on: ${{ vars.RUNNER }}
@@ -145,17 +158,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          path: ./current_repo_current_branch
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Checkout geoips default branch
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           repository: ${{ vars.GEOIPS_ORGANIZATION }}/geoips
           ref: ${{ vars.GEOIPS_DEFAULT_BRANCH }}
-          token: ${{ secrets.token }}
           path: ./geoips_repo_default_branch
-          clean: true
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -165,4 +174,11 @@ jobs:
         run: pip install bandit
       - name: Run bandit
         run: |
-          ./geoips_repo_default_branch/tests/utils/check_code.sh bandit ./current_repo_current_branch
+          ./geoips_repo_default_branch/tests/utils/check_code.sh bandit .
+      - name: Save linting results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-lint-results
+          path: bandit-lint-results.txt
+          retention-days: 1
