@@ -36,8 +36,8 @@ jobs:
           
           KEYS=("feature" "enhancement" "deprecation")
           CHANGED_FILES=$(git diff --name-only "$commit_hash" HEAD)
-          CHANGED_FEATURE_FILES=$(echo "${CHANGED_FILES}" | grep '^docs/source/releases/latest/.*\.yaml$' || true)
-          CHANGED_DOC_FILES=$(echo "${CHANGED_FILES}" | grep '^docs/.*\.rst$' || true)
+          CHANGED_FEATURE_FILES=$(echo "${CHANGED_FILES}" | grep '^docs/source/releases/latest/.*\.yaml$' || true) # Get release note changes
+          CHANGED_DOC_FILES=$(echo "${CHANGED_FILES}" | grep '^docs/.*\.rst$' || true) # Get changed rst files in docs
       
           if [ -z "${CHANGED_FEATURE_FILES}" ]; then
             echo "No YAML files in 'docs/source/releases/latest/' were changed. Skipping doc check."
