@@ -14,21 +14,27 @@
 
 name: Run linters  # Workflow name
 
+# Set default permissions for all jobs to read-only
+permissions:
+  contents: read
+
 on:
-  pull_request: 
-  workflow_call: 
+  pull_request:  # Trigger on pull request events
+  workflow_call:  # Allow manual workflow dispatch
     secrets:
       token:
         required: true  # Require authentication token
 
 defaults:
   run:
-    shell: bash
+    shell: bash  # Use bash as the default shell for all run steps
 
 jobs:
   # Job to determine which linters should be run based on repository configuration
   get-job-flags:
-    runs-on: ${{ vars.RUNNER }}  # Use runner specified in repo/org variables
+    runs-on: ${{ vars.RUNNER }}  # Use runner specified in repository variables
+    permissions:
+      contents: read  # Only needs read access to repository contents
     outputs:
       # Output flags for each linter to be used in subsequent jobs
       CI_LINT_BANDIT: ${{ steps.get_job_flags.outputs.CI_LINT_BANDIT }}
@@ -59,10 +65,12 @@ jobs:
               fi
           done
 
-  # Job to print configuration variables (for debugging)
+  # Job to print configuration variables (optional, for debugging)
   print-variables:
     name: Print variables
     needs: [get-job-flags]
+    permissions:
+      contents: read  # Only needs read access to repository contents
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
     with:
       # Pass linter flags to print-variables workflow
@@ -104,6 +112,7 @@ jobs:
           name: black-lint-results
           path: black-lint-results.txt
           retention-days: 1
+          if-no-files-found: warn
 
   doc8-lint:
     runs-on: ${{ vars.RUNNER }}
@@ -136,6 +145,7 @@ jobs:
           name: doc8-lint-results
           path: doc8-lint-results.txt
           retention-days: 1
+          if-no-files-found: warn
 
   flake8-lint:
     runs-on: ${{ vars.RUNNER }}
@@ -170,6 +180,7 @@ jobs:
           name: flake8-lint-results
           path: flake8-lint-results.txt
           retention-days: 1
+          if-no-files-found: warn
 
   bandit-lint:
     runs-on: ${{ vars.RUNNER }}
@@ -203,3 +214,4 @@ jobs:
           name: bandit-lint-results
           path: bandit-lint-results.txt
           retention-days: 1
+          if-no-files-found: warn
