@@ -1,0 +1,17 @@
+actions:
+- title: 'Adds reusable PR is Done check'
+  description: 'This change added two checks to see if a PR is "done" and ready for review. It checks whether or not documentation has been added when needed and whether or not the PR checkboxes have been checked.'
+  files:
+    added:
+    - '.github/workflows/reusable-pr-check-boxes-complete.yaml'
+    - '.github/workflows/reusable-proper-rst-documentation-edits.yaml'
+    - '.github/workflows/ruleset-pr-check-boxes-complete.yaml'
+    - '.github/workflows/ruleset-proper-rst-documentation-edits.yaml'
+    - 'sync_external/.github/workflows/ruleset-pr-check-boxes-complete.yaml'
+    - 'sync_external/.github/workflows/ruleset-proper-rst-documentation-edits.yaml'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: null
+    finish: null
