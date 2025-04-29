@@ -3,6 +3,10 @@ name: Spell Check
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   spell-check:
     name: Check spelling in changed files
