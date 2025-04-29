@@ -1,36 +1,55 @@
-name: Run linters
+# Lint Check Workflow
+#
+# This workflow runs various linting tools on the repository to ensure code quality
+# and adherence to coding standards. It supports configurable linting options
+# through GitHub variables and can be triggered on pull requests or called manually.
+#
+# Supported linters:
+# - Black (code formatting)
+# - Doc8 (documentation formatting)
+# - Flake8 (code style and quality)
+# - Bandit (security vulnerability scanning)
+#
+# The workflow dynamically enables/disables linters based on repository configuration.
+
+name: Run linters  # Workflow name
 
 on:
-  pull_request:
-  workflow_call:
+  pull_request: 
+  workflow_call: 
     secrets:
       token:
-        required: true
+        required: true  # Require authentication token
 
 defaults:
   run:
     shell: bash
 
 jobs:
+  # Job to determine which linters should be run based on repository configuration
   get-job-flags:
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ vars.RUNNER }}  # Use runner specified in repo/org variables
     outputs:
+      # Output flags for each linter to be used in subsequent jobs
       CI_LINT_BANDIT: ${{ steps.get_job_flags.outputs.CI_LINT_BANDIT }}
       CI_LINT_DOC8: ${{ steps.get_job_flags.outputs.CI_LINT_DOC8 }}
       CI_LINT_FLAKE8: ${{ steps.get_job_flags.outputs.CI_LINT_FLAKE8 }}
       CI_LINT_BLACK: ${{ steps.get_job_flags.outputs.CI_LINT_BLACK }}
     steps:
-      - name: Get job flags
+      - name: Get job flags  # Step to determine linter flags
         id: get_job_flags
         run: |
+          # Array of linter flags to check
           flags=(CI_LINT_BANDIT CI_LINT_DOC8 CI_LINT_FLAKE8 CI_LINT_BLACK)
           for flag in "${flags[@]}"; do
+              # Determine flag value based on repository variables
               case $flag in
                   CI_LINT_BANDIT) val="${{ vars.CI_LINT_BANDIT }}" ;;
                   CI_LINT_DOC8) val="${{ vars.CI_LINT_DOC8 }}" ;;
                   CI_LINT_FLAKE8) val="${{ vars.CI_LINT_FLAKE8 }}" ;;
                   CI_LINT_BLACK) val="${{ vars.CI_LINT_BLACK }}" ;;
               esac
+              # Set output to true/false based on variable value
               if [ "$val" == "false" ]; then
                   echo "${flag}=false"
                   echo "${flag}=false" >> $GITHUB_OUTPUT
@@ -40,11 +59,13 @@ jobs:
               fi
           done
 
+  # Job to print configuration variables (for debugging)
   print-variables:
     name: Print variables
     needs: [get-job-flags]
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
     with:
+      # Pass linter flags to print-variables workflow
       CI_LINT_BANDIT: ${{ needs.get-job-flags.outputs.CI_LINT_BANDIT }}
       CI_LINT_DOC8: ${{ needs.get-job-flags.outputs.CI_LINT_DOC8 }}
       CI_LINT_FLAKE8: ${{ needs.get-job-flags.outputs.CI_LINT_FLAKE8 }}
