@@ -1,0 +1,43 @@
+continuous integration:
+  - title: "Build stable image on tag."
+    description: |
+      Ensure stable geoips docker image is built on tag/release.  This ensures
+      the latest stable image is available for plugin packages to use in PR
+      status checks.
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - .github/workflows/reusable-build-docker-image.yaml
+      modified:
+        - .github/workflows/reusable-doc-test.yaml
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: "Jan 09 2025"
+      finish: "Jan 09 2025"
+  - title: "Add release note template for open source upload release note."
+    description: |
+      Template release note to copy for open source upload during release process.
+      Must ensure all repos have a release note for the CURRENT geoips version,
+      not just for the latest tagged version for the current repository.
+      This release note tracks that a repo was uploaded with the given geoips
+      version.
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - docs/templates/release_note_version_release/open-source-upload.yaml
+      modified:
+        - ""
+    related-issue:
+      number: null
+      repo_url: ""
+    date:
+      start: "Jan 09 2025"
+      finish: "Jan 09 2025"

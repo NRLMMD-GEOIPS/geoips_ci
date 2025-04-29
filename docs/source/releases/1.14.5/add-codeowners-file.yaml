@@ -1,0 +1,27 @@
+actions:
+- title: 'Add CODEOWNERS file to geoips_ci .github and sync folder'
+  description: |
+    To ensure the appropriate members approve all pull requests across
+    the organization, add CODEOWNERS file to .github folders in all repos.
+    CODEOWNERS can only require a single team review, so only require
+    NRL via CODEOWNERS, implying the other approval must be from CIRA.
+
+    Note if the team specified in the CODEOWNERS file does not exist,
+    or does not have write access to the repository, the CODEOWNERS file
+    will not be enforced.
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - '.github/CODEOWNERS'
+    - 'sync/.github/CODEOWNERS'
+    modified:
+    - ''
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: 2025-03-04
+    finish: 2025-03-04
