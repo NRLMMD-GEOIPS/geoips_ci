@@ -79,7 +79,7 @@ jobs:
       CI_LINT_FLAKE8: ${{ needs.get-job-flags.outputs.CI_LINT_FLAKE8 }}
       CI_LINT_BLACK: ${{ needs.get-job-flags.outputs.CI_LINT_BLACK }}
 
-  black-lint:
+  black:
     runs-on: ${{ vars.RUNNER }}
     needs: [get-job-flags, print-variables]
     if: ${{ needs.get-job-flags.outputs.CI_LINT_BLACK == 'true' }}
@@ -114,7 +114,7 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
-  doc8-lint:
+  doc8:
     runs-on: ${{ vars.RUNNER }}
     needs: [get-job-flags, print-variables]
     if: ${{ needs.get-job-flags.outputs.CI_LINT_DOC8 == 'true' }}
@@ -147,7 +147,7 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
-  flake8-lint:
+  flake8:
     runs-on: ${{ vars.RUNNER }}
     needs: [get-job-flags, print-variables]
     if: ${{ needs.get-job-flags.outputs.CI_LINT_FLAKE8 == 'true' }}
@@ -182,7 +182,7 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
-  bandit-lint:
+  bandit:
     runs-on: ${{ vars.RUNNER }}
     needs: [get-job-flags, print-variables]
     if: ${{ needs.get-job-flags.outputs.CI_LINT_BANDIT == 'true' }}
