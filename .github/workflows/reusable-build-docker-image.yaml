@@ -42,6 +42,7 @@ env:
   #   # runs-on field, so we MUST use the vars context for the default.
   #   RUNNER_DOCKERBUILD: runner to build docker containers
   #   RUNNER_DOCKERRUN: runner to run docker containers
+  #   USE_CONTAINER_REGISTRY: true/false, specify whether to use the container registry
 
   # The path to the GeoIPS package in DOCLINTTEST images
   BASE_GEOIPS_PATH: /packages/geoips
@@ -59,6 +60,7 @@ jobs:
     runs-on: ${{ vars.RUNNER }}
     env:
       CURR_REPO: ${{ github.event.repository.name }}
+      DOCKER_REGISTRY_USER: ${{ vars.DOCKER_REGISTRY_USER }}
     outputs:
       # The name of the untagged docker images to be created by this workflow
       IMAGE_NAME: ${{ steps.set_image_name.outputs.IMAGE_NAME }}
@@ -73,7 +75,9 @@ jobs:
         run: |
           repo_name=$(echo ${{ github.repository }} | cut -d'/' -f2)
           # Create an image name using the organiztion and repository names, lowercase
-          image_name=${{ vars.DOCKER_REGISTRY_USER }}/geoips
+          # At one point removed DOCKER_REGISTRY_USER, unsure why.
+          # image_name=geoips
+          image_name=${DOCKER_REGISTRY_USER}/geoips
           echo "REPO_NAME=${repo_name}"
           echo "REPO_NAME=${repo_name}" >> ${GITHUB_ENV}
           echo "REPO_NAME=${repo_name}" >> ${GITHUB_OUTPUT}
@@ -100,10 +104,10 @@ jobs:
         run: |
           owner=${{ github.repository_owner }}
           owner=${owner,,}
-          doclinttest_image_name=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}
-          echo "DOCLINTTEST_IMAGE=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}"
-          echo "DOCLINTTEST_IMAGE=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}" >> ${GITHUB_ENV}
-          echo "DOCLINTTEST_IMAGE=${{ env.IMAGE_NAME }}:${DOCLINTTEST_TAG}" >> ${GITHUB_OUTPUT}
+          doclinttest_image_name=${IMAGE_NAME}:${DOCLINTTEST_TAG}
+          echo "DOCLINTTEST_IMAGE=${IMAGE_NAME}:${DOCLINTTEST_TAG}"
+          echo "DOCLINTTEST_IMAGE=${IMAGE_NAME}:${DOCLINTTEST_TAG}" >> ${GITHUB_ENV}
+          echo "DOCLINTTEST_IMAGE=${IMAGE_NAME}:${DOCLINTTEST_TAG}" >> ${GITHUB_OUTPUT}
 
   print-build-image-variables:
     name: Print build image variables
@@ -130,12 +134,15 @@ jobs:
     needs: get-job-flags
     if: >
       ! cancelled() &&
-      vars.USE_CONDA_FOR_ACTIONS != 'true' &&
       github.event.repository.name == 'geoips'
     env:
       IMAGE_NAME: ${{ needs.get-job-flags.outputs.IMAGE_NAME }}
+      REPO_NAME: ${{ needs.get-job-flags.outputs.REPO_NAME }}
       BUILDCACHE_IMAGE: ${{ needs.get-job-flags.outputs.IMAGE_NAME }}:buildcache
       DOCLINTTEST_IMAGE: ${{ needs.get-job-flags.outputs.DOCLINTTEST_IMAGE }}
+      DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
+      DOCKER_REGISTRY_USER: ${{ vars.DOCKER_REGISTRY_USER }}
+      USE_CONTAINER_REGISTRY: ${{ vars.USE_CONTAINER_REGISTRY }}
     # Can't write to registry without this
     permissions:
       contents: read
@@ -157,8 +164,8 @@ jobs:
         # https://github.com/docker/login-action/commit/9780b0c442fbb1117ed29e0efdff1e18412f7567
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3 / v3.3.0
         with:
-          registry: ${{ vars.DOCKER_REGISTRY }}
-          username: ${{ vars.DOCKER_REGISTRY_USER }}
+          registry: ${DOCKER_REGISTRY}
+          username: ${DOCKER_REGISTRY_USER}
           password: ${{ secrets.docker_token }}
 
       # This cache allows the second push below when on the default branch
@@ -178,6 +185,14 @@ jobs:
           echo "runner os: ${{ runner.os }}"
           echo "github sha: ${{ github.sha }}"
           echo "build cache image: ${{ env.BUILDCACHE_IMAGE }}"
+          echo "vars.USE_CONTAINER_REGISTRY: ${USE_CONTAINER_REGISTRY}"
+          FULL_BUILDCACHE_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${BUILDCACHE_IMAGE}
+          FULL_DOCLINTTEST_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${DOCLINTTEST_IMAGE}
+          FULL_STABLEORLATEST_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${STABLEORLATEST_IMAGE}
+          echo "docker build --file Dockerfile --tag ${FULL_DOCLINTTEST_IMAGE} --tag ${FULL_BUILDCACHE_IMAGE} --tag ${FULL_STABLEORLATEST_IMAGE} --target doclinttest ."
+          echo "docker push $FULL_BUILDCACHE_IMAGE"
+          echo "docker push $FULL_DOCLINTTEST_IMAGE"
+          echo "docker push $FULL_STABLEORLATEST_IMAGE"
           # Create stable image on default branch
           if [[ "${GITHUB_REF}" == "refs/heads/${{ github.event.repository.default_branch }}" ]]; then
             stableorlatest_image="${IMAGE_NAME}:doclinttest-stable"
@@ -203,21 +218,60 @@ jobs:
 
       # If using docker buildx was requested via organization variable,
       # DO NOT run this section.
-      - name: Build and push docker image with explicit docker build
+      - name: Build docker image with explicit docker build
         if: ${{ vars.USE_DOCKER_BUILDX_ACTION == 'false' }}
         # > makes newlines into spaces, so single command on multiple lines.
-        run: >
-          which docker;
-          docker build
-          --file Dockerfile
-          --tag ${DOCLINTTEST_IMAGE}
-          --tag ${BUILDCACHE_IMAGE}
-          --tag ${STABLEORLATEST_IMAGE}
-          --target doclinttest
-          .;
-          docker push ${BUILDCACHE_IMAGE};
-          docker push ${DOCLINTTEST_IMAGE};
-          docker push ${STABLEORLATEST_IMAGE};
+        run: |
+          FULL_BUILDCACHE_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${BUILDCACHE_IMAGE}
+          FULL_DOCLINTTEST_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${DOCLINTTEST_IMAGE}
+          FULL_STABLEORLATEST_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${STABLEORLATEST_IMAGE}
+          which docker
+          echo "docker build --file Dockerfile --tag ${FULL_DOCLINTTEST_IMAGE} --tag ${FULL_BUILDCACHE_IMAGE} --tag ${FULL_STABLEORLATEST_IMAGE} --target doclinttest ."
+          docker build --file Dockerfile --tag ${FULL_DOCLINTTEST_IMAGE} --tag ${FULL_BUILDCACHE_IMAGE} --tag ${FULL_STABLEORLATEST_IMAGE} --target doclinttest .
+
+      # If using docker buildx was requested via organization variable,
+      # DO NOT run this section.
+      - name: List docker images on disk
+        if: ${{ vars.USE_DOCKER_BUILDX_ACTION == 'false' }}
+        # > makes newlines into spaces, so single command on multiple lines.
+        run: |
+          FULL_BUILDCACHE_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${BUILDCACHE_IMAGE}
+          FULL_DOCLINTTEST_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${DOCLINTTEST_IMAGE}
+          FULL_STABLEORLATEST_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${STABLEORLATEST_IMAGE}
+
+          echo "docker push $FULL_BUILDCACHE_IMAGE"
+          docker manifest inspect ${FULL_BUILDCACHE_IMAGE}
+
+          # echo "docker push $FULL_DOCLINTTEST_IMAGE"
+          # docker manifest inspect ${FULL_DOCLINTTEST_IMAGE}
+
+          echo "docker push $FULL_STABLEORLATEST_IMAGE"
+          docker manifest inspect ${FULL_STABLEORLATEST_IMAGE}
+
+          docker image ls
+          
+      # If using docker buildx was requested via organization variable,
+      # DO NOT run this section.
+      - name: Push docker image with explicit docker push
+        if: ${{ vars.USE_DOCKER_BUILDX_ACTION == 'false' && vars.USE_CONTAINER_REGISTRY == 'true' }}
+        # > makes newlines into spaces, so single command on multiple lines.
+        run: |
+          FULL_BUILDCACHE_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${BUILDCACHE_IMAGE}
+          FULL_DOCLINTTEST_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${DOCLINTTEST_IMAGE}
+          FULL_STABLEORLATEST_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${STABLEORLATEST_IMAGE}
+
+          echo "docker push $FULL_BUILDCACHE_IMAGE"
+          docker manifest inspect ${FULL_BUILDCACHE_IMAGE}
+          docker push $FULL_BUILDCACHE_IMAGE
+
+          echo "docker push $FULL_DOCLINTTEST_IMAGE"
+          docker manifest inspect ${FULL_DOCLINTTEST_IMAGE}
+          docker push $FULL_DOCLINTTEST_IMAGE
+
+          echo "docker push $FULL_STABLEORLATEST_IMAGE"
+          docker manifest inspect ${FULL_STABLEORLATEST_IMAGE}
+          docker push $FULL_STABLEORLATEST_IMAGE
+
       - name: Build and push docker image with docker buildx action
         if: ${{ vars.USE_DOCKER_BUILDX_ACTION == 'true' }}
         # References the below commit, which matched both v6 and v6.12.0 at the time
