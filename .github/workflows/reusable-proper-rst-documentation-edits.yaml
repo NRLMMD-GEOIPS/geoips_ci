@@ -30,7 +30,7 @@ jobs:
       # Aka.... if there is a new feature OR a deprecation the docs MUST be edited in some way.
       - name: Check release notes for feature changes, and then require docs updates if found
         env:
-          commit_hash: ${{ github.event.pull_request.base.sha  }}
+          commit_hash: echo '${{ github.event.pull_request.base.sha  }}'
         run: |
           set -euo pipefail
           
