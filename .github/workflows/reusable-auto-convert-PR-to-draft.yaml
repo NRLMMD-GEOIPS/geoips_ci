@@ -22,8 +22,10 @@ jobs:
   change-to-draft:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
-    
+      issues: write
+      
     steps:
       - name: Get PR information
         id: pr_info
