@@ -161,6 +161,10 @@
         "**/*.grb2",
         "**/*.area",
         "**/*.geotiff",
+
+        // CSpell configs
+        "**/*cspell.json",
+        "*cspell.json"
     ],
 
     // --- Dictionaries ---
