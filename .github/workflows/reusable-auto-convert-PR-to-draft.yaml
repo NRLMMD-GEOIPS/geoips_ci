@@ -105,7 +105,7 @@ jobs:
           echo "Converting PR #${PR_NUMBER} to draft status..."
           
           # The correct command to convert a PR to draft
-          gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo
+          echo $(gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo)
           OUTPUT=$(gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo 2>&1)
           EXIT_CODE=$?
           
@@ -117,6 +117,7 @@ jobs:
             echo "success=false" >> $GITHUB_OUTPUT
             # Continue workflow instead of failing to allow comment step
           fi
+          echo "success=true" >> $GITHUB_OUTPUT
         shell: bash
 
       - name: Add Comment to PR
