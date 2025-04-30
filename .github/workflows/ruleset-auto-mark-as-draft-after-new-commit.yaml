@@ -11,7 +11,8 @@ jobs:
       pull-requests: write
       issues: write
       statuses: write
-    secrets: ${{ secrets.GITHUB_TOKEN }}
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-auto-convert-PR-to-draft.yaml@29-convert-prs-to-draft-after-every-commit-on-an-open-pr
     with:
       pr_number: ${{ github.event.pull_request.number }}
