@@ -91,7 +91,7 @@ jobs:
           fi
         shell: bash
 
-      - name: Change PR to Draft
+      - name: Change PR to Draft # and do that via the API because the default token can't with the gh CLI
         if: >-
           steps.pr_info.outputs.pr_exists == 'true' && 
           steps.pr_info.outputs.is_draft == 'false' && 
@@ -104,18 +104,22 @@ jobs:
         run: |
           echo "Converting PR #${PR_NUMBER} to draft status..."
           
-          # The correct command to convert a PR to draft
-          gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo
-          OUTPUT=$(gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo 2>&1)
-          EXIT_CODE=$?
+          # Use REST API instead of gh pr ready --undo
+          RESPONSE=$(curl -s -X PATCH \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
+            -d '{"draft":true}')
           
-          if [[ $EXIT_CODE -eq 0 ]]; then
+          # Check if the update was successful
+          UPDATED_DRAFT=$(echo "$RESPONSE" | jq -r '.draft')
+          
+          if [[ "$UPDATED_DRAFT" == "true" ]]; then
             echo "Successfully converted PR to draft status"
             echo "success=true" >> $GITHUB_OUTPUT
           else
-            echo "::error::Failed to convert PR to draft status: ${OUTPUT}"
+            echo "::error::Failed to convert PR to draft status: $(echo "$RESPONSE" | jq -r '.message')"
             echo "success=false" >> $GITHUB_OUTPUT
-            # Continue workflow instead of failing to allow comment step
           fi
         shell: bash
 
