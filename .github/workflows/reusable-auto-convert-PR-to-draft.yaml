@@ -63,7 +63,7 @@ jobs:
         id: check_pr
         if: steps.pr_info.outputs.pr_exists == 'true' && steps.pr_info.outputs.is_draft == 'false'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
           SKIP_LABEL_CHECK: ${{ inputs.skip_label_check }}
         run: |
@@ -97,7 +97,7 @@ jobs:
           steps.check_pr.outputs.should_convert == 'true'
         id: convert_to_draft
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
         run: |
           echo "Converting PR #${PR_NUMBER} to draft status..."
@@ -122,7 +122,7 @@ jobs:
           steps.pr_info.outputs.pr_exists == 'true' && 
           steps.convert_to_draft.outputs.success == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
           PR_AUTHOR: ${{ steps.pr_info.outputs.pr_author }}
         run: |
@@ -130,7 +130,7 @@ jobs:
           COMMENT="Hi @${PR_AUTHOR}, this PR has been automatically converted to draft status.
           When you're ready for review again, please mark it as 'Ready for review'.
           
-          If you want to prevent this behavior for this PR please add a `no-auto-draft` label to this PR.
+          If you want to prevent this behavior for this PR please add a \`no-auto-draft\` label to this PR.
           *This is an automated action by a CI workflow.*"
           
           gh pr comment ${PR_NUMBER} --body "$COMMENT"
@@ -142,7 +142,7 @@ jobs:
           steps.pr_info.outputs.pr_exists == 'true' && 
           steps.convert_to_draft.outputs.success == 'false'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
         run: |
           echo "⚠️ Draft Conversion Failed"
