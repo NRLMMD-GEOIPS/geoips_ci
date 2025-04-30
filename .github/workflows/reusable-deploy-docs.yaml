@@ -167,7 +167,6 @@ jobs:
           #   the geoips repo url, and
           #   a path to a new directory for the ghpages checkout/push
           #   the name of the current repository
-          git config --global user.email "githubactions@github.com"
           git config --global user.name "GitHub Actions"
           ./geoips_default_branch/docs/deploy_pages.sh ./current_repo_current_branch "https://github.com/NRLMMD-GEOIPS" ./ghpages_repo $curr_repo
           ret=$?
