@@ -91,19 +91,6 @@ jobs:
           fi
         shell: bash
 
-      - name: Generate GitHub App Token
-        if: >- # Condition when conversion might be needed
-          steps.pr_info.outputs.pr_exists == 'true' && 
-          steps.pr_info.outputs.is_draft == 'false' && 
-          steps.check_pr.outputs.should_convert == 'true'
-        id: generate_token
-        uses: tibdex/github-app-token@v2 # Use the action
-        with:
-          app_id: ${{ secrets.APP_ID }}
-          private_key: ${{ secrets.APP_PRIVATE_KEY }}
-          # Optional: specify repository if different from current one
-          # repository: ${{ github.repository }} 
-
       - name: Change PR to Draft
         if: >-
           steps.pr_info.outputs.pr_exists == 'true' && 
@@ -111,14 +98,14 @@ jobs:
           steps.check_pr.outputs.should_convert == 'true'
         id: convert_to_draft
         env:
-          # Use the App token generated in the previous step
-          GH_TOKEN: ${{ steps.generate_token.outputs.token }} 
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          echo "Converting PR #${PR_NUMBER} to draft status using GitHub App token..."
+          echo "Converting PR #${PR_NUMBER} to draft status..."
           
-          # Now gh pr ready --undo should work with the App token
+          # The correct command to convert a PR to draft
+          gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo
           OUTPUT=$(gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo 2>&1)
           EXIT_CODE=$?
           
@@ -126,11 +113,9 @@ jobs:
             echo "Successfully converted PR to draft status"
             echo "success=true" >> $GITHUB_OUTPUT
           else
-            # Output the actual error from the gh command
-            echo "::error::Failed to convert PR to draft status: ${OUTPUT}" 
+            echo "::error::Failed to convert PR to draft status: ${OUTPUT}"
             echo "success=false" >> $GITHUB_OUTPUT
-            # Consider failing the step if conversion is critical
-            # exit 1 
+            # Continue workflow instead of failing to allow comment step
           fi
         shell: bash
 
