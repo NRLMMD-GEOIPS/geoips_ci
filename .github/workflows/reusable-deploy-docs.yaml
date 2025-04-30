@@ -162,15 +162,19 @@ jobs:
               fi
           fi
 
-          # Configure Git user (good practice)
-          git config --global user.name "github-actions[bot]"
+          echo "Configuring Git for authentication..."
+          # Use the GITHUB_TOKEN provided by Actions for authentication
+          # This replaces any https://github.com/ URL with an authenticated one
+          GH_HOST=$(echo "$GITHUB_SERVER_URL" | sed 's#^https://##')
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@${GH_HOST}/".insteadOf "https://${GH_HOST}/"
+
+          # Set committer identity (already present in your script)
+          git config --global user.name "GitHub Actions"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Configure Git to use the GITHUB_TOKEN for authentication over HTTPS
-          # This tells git to add an Authorization header to all HTTPS requests to github.com
-          echo "Configuring git authentication..."
-          git config --global http.https://github.com/.extraheader "Authorization: Bearer $GITHUB_TOKEN"
-          echo "Git authentication configured."
+          if [[ -d ./ghpages_repo ]]; then
+              # ... (your existing rm block) ...
+          fi
           
           # Use the deploy_pages.sh script from the geoips default branch.
           # Pass in the
@@ -178,7 +182,7 @@ jobs:
           #   the geoips repo url, and
           #   a path to a new directory for the ghpages checkout/push
           #   the name of the current repository
-          ./geoips_default_branch/docs/deploy_pages.sh ./current_repo_current_branch "https://github.com/NRLMMD-GEOIPS" ./ghpages_repo $curr_repo
+          ./geoips_default_branch/docs/deploy_pages.sh ./current_repo_current_branch $GEOIPS_REPO_URL ./ghpages_repo $curr_repo
           ret=$?
           if [[ "${ret##*:}" != *"0"* ]]; then
             echo "::error::Deploying docs to GitHub pages ${ret##*:}"
