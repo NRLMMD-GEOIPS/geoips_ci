@@ -126,7 +126,8 @@ jobs:
           fi
           # Note pdf build failing right now - temporarily only produce html so it works
           # ./geoips_default_branch/docs/build_docs.sh ./current_repo_current_branch $curr_repo html_pdf ./geoips_default_branch/docs
-          ./geoips_default_branch/docs/build_docs.sh ./current_repo_current_branch $run_on_package html_only ./geoips_default_branch/docs
+          # ./geoips_default_branch/docs/build_docs.sh ./current_repo_current_branch $run_on_package html_only ./geoips_default_branch/docs
+          python3 ./geoips_default_branch/docs/build_docs.py --geoips-docs-path ./current_repo_current_branch/docs --repo-path ./geoips_default_branch $run_on_package 
           ret=$?
           if [[ "${ret##*:}" != *"0"* ]]; then
             echo "::error::Building html docs ${ret##*:}"
