@@ -1,7 +1,7 @@
 name: Check release branch
 
 env:
-  RUNNER_OS: ${{ vars.RUNNER_OS || ‘ubuntu-latest’ }}  # Default value fallback
+  RUNNER_OS: ${{ vars.RUNNER || ‘ubuntu-latest’ }} # Default value fallback
   
 on:
   workflow_call:
