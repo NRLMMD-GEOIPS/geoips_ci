@@ -111,12 +111,13 @@ jobs:
           
           if [[ $EXIT_CODE -eq 0 ]]; then
             echo "Successfully converted PR to draft status"
-            echo "success=true" >> $GITHUB_OUTPUT
+            #echo "success=true" >> $GITHUB_OUTPUT
           else
             echo "::error::Failed to convert PR to draft status: ${OUTPUT}"
-            echo "success=false" >> $GITHUB_OUTPUT
+            #echo "success=false" >> $GITHUB_OUTPUT
             # Continue workflow instead of failing to allow comment step
           fi
+          echo THIS IS CURRENTLY BROKEN, NEEDS DIFFERENT PERMISSIONS TO WORK
           echo "success=true" >> $GITHUB_OUTPUT
         shell: bash
 
