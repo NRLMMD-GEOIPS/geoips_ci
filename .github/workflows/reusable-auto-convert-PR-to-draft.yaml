@@ -31,7 +31,7 @@ jobs:
       - name: Get PR information
         id: pr_info
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}  # Changed from secrets.GITHUB_TOKEN
           PR_NUMBER: ${{ inputs.pr_number }}
         run: |
           echo "Fetching metadata for PR #${PR_NUMBER}..."
@@ -43,6 +43,9 @@ jobs:
             echo "pr_exists=false" >> $GITHUB_OUTPUT
             exit 1
           fi
+          
+          # Print the PR data for debugging
+          echo "PR Data: ${PR_DATA}"
           
           # Extract PR data from json response
           IS_DRAFT=$(echo "$PR_DATA" | jq -r '.draft')
