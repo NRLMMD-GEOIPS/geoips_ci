@@ -13,7 +13,7 @@ name: Deploy docs
 #    * deploy docs with geoips/docs/deploy_pages.sh
 
 env:
-  RUNNER_OS: ${{ vars.RUNNER_OS || ‘ubuntu-latest’ }}  # Default value fallback
+  RUNNER_OS: ${{ vars.RUNNER || ‘ubuntu-latest’ }} # Default value fallback
 
 on:
   workflow_call:
