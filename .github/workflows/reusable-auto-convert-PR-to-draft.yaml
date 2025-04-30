@@ -105,7 +105,7 @@ jobs:
           echo "Converting PR #${PR_NUMBER} to draft status..."
           
           # The correct command to convert a PR to draft
-          echo $(gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo)
+          echo "gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo"
           OUTPUT=$(gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo 2>&1)
           EXIT_CODE=$?
           
