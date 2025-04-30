@@ -91,37 +91,46 @@ jobs:
           fi
         shell: bash
 
-      - name: Change PR to Draft # and do that via the API because the default token can't with the gh CLI
+      - name: Generate GitHub App Token
+        if: >- # Condition when conversion might be needed
+          steps.pr_info.outputs.pr_exists == 'true' && 
+          steps.pr_info.outputs.is_draft == 'false' && 
+          steps.check_pr.outputs.should_convert == 'true'
+        id: generate_token
+        uses: tibdex/github-app-token@v2 # Use the action
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+          # Optional: specify repository if different from current one
+          # repository: ${{ github.repository }} 
+
+      - name: Change PR to Draft
         if: >-
           steps.pr_info.outputs.pr_exists == 'true' && 
           steps.pr_info.outputs.is_draft == 'false' && 
           steps.check_pr.outputs.should_convert == 'true'
         id: convert_to_draft
         env:
-          GH_TOKEN: ${{ github.token }}
+          # Use the App token generated in the previous step
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }} 
           PR_NUMBER: ${{ inputs.pr_number }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          echo "Converting PR #${PR_NUMBER} to draft status..."
+          echo "Converting PR #${PR_NUMBER} to draft status using GitHub App token..."
           
-          # Use REST API instead of gh pr ready --undo
-          RESPONSE=$(curl -s -X PATCH \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" \
-            -d '{"draft":true}')
-
-          echo "$RESPONSE"
+          # Now gh pr ready --undo should work with the App token
+          OUTPUT=$(gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo 2>&1)
+          EXIT_CODE=$?
           
-          # Check if the update was successful
-          UPDATED_DRAFT=$(echo "$RESPONSE" | jq -r '.draft')
-          
-          if [[ "$UPDATED_DRAFT" == "true" ]]; then
+          if [[ $EXIT_CODE -eq 0 ]]; then
             echo "Successfully converted PR to draft status"
             echo "success=true" >> $GITHUB_OUTPUT
           else
-            echo "::error::Failed to convert PR to draft status: $(echo "$RESPONSE" | jq -r '.message')"
+            # Output the actual error from the gh command
+            echo "::error::Failed to convert PR to draft status: ${OUTPUT}" 
             echo "success=false" >> $GITHUB_OUTPUT
+            # Consider failing the step if conversion is critical
+            # exit 1 
           fi
         shell: bash
 
