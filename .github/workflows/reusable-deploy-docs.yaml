@@ -112,11 +112,27 @@ jobs:
         run: |
           which pip
           echo "Build html docs"
+          
+          # Ie, get 'recenter_tc' out of 'NRLMMD-GEOIPS/recenter_tc'
+          curr_repo=`echo "$GITHUB_REPOSITORY" | sed "s,$GITHUB_REPOSITORY_OWNER/,,"`
+          # Call build_docs.sh from the geoips default branch
+          # Pass in
+          #   the path to the current plugin repo,
+          #   the name of the current repo,
+          #   "html_pdf" to indicate producing both html and pdf output, and
+          #   the path to the docs template directory in the geoips default branch.
+          # If we are specifically "template_basic_plugin" repo, then we must use
+          # my_package as the package name.  Otherwise the package name matches
+          # the plugin name.
+          run_on_package=$curr_repo
+          if [[ "$curr_repo" == "template_basic_plugin" ]]; then
+            run_on_package=my_package
+          fi
           export GEOIPS_PACKAGES_DIR="."
           export GEOIPS_OUTDIRS=""
           export GEOIPS_TESTDATA_DIR="" # necessary for GeoIPS to be importable for the docs to build. Just has to be set to *something*
           ln -s ./geoips_default_branch ./geoips # the CLI *requires* the geoips folder to be named "geoips" so soft linking here
-          python3 ./geoips_default_branch/docs/build_docs.py --geoips-docs-path ./geoips_default_branch/docs --repo-path ./current_repo_current_branch "$PACKAGE_NAME" 
+          python3 ./geoips_default_branch/docs/build_docs.py --geoips-docs-path ./geoips_default_branch/docs --repo-path ./current_repo_current_branch "$curr_repo" 
           ret=$?
           if [[ "${ret##*:}" != *"0"* ]]; then
             echo "::error::Building html docs ${ret##*:}"
@@ -130,6 +146,10 @@ jobs:
         run: |
           which pip
           echo "Deploy docs to github pages"
+          
+          # GITHUB_REPOSITORY, GITHUB_REPOSITORY_OWNER, and GITHUB_SERVER_URL are all
+          # standard github variables defined for every github actions run.
+          # Ie, get 'recenter_tc' out of 'NRLMMD-GEOIPS/recenter_tc'
           # ie, https://github.com/NRLMMD-GEOIPS
           GEOIPS_REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY_OWNER"
           # Remove ghpages_repo dir if it exists.
@@ -172,6 +192,11 @@ jobs:
           fi
           
           # Use the deploy_pages.sh script from the geoips default branch.
+          # Pass in the
+          #   current plugin repo path,
+          #   the geoips repo url, and
+          #   a path to a new directory for the ghpages checkout/push
+          #   the name of the current repository
           ./geoips_default_branch/docs/deploy_pages.sh ./current_repo_current_branch "$GEOIPS_REPO_URL" ./ghpages_repo "$REPO_NAME" 
           ret=$?
           if [[ "${ret##*:}" != *"0"* ]]; then
