@@ -38,6 +38,7 @@ jobs:
     name: "Build and deploy docs to GitHub Pages"
     permissions:
       contents: write
+      id-token: write
     steps:
       - name: Setup Python
         uses: actions/setup-python@v5 # v5 is the latest for setup-python
