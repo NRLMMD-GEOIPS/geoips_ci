@@ -31,14 +31,21 @@ jobs:
       - name: Get PR information
         id: pr_info
         env:
-          GH_TOKEN: ${{ github.token }}  # Changed from secrets.GITHUB_TOKEN
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          echo "Fetching metadata for PR #${PR_NUMBER}..."
+          echo "Fetching metadata for PR #${PR_NUMBER} in repository ${GITHUB_REPOSITORY}..."
+          gh --version
           
-          # Check if PR exists and get its current status
-          PR_DATA=$(gh pr view ${PR_NUMBER} --json number,draft,author,url 2>&1)
-          if [[ $? -ne 0 ]]; then
+          echo "Attempting to fetch PR with explicit repository..."
+          PR_DATA=$(gh pr view ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --json number,draft,author,url 2>&1)
+          PR_EXIT_CODE=$?
+          
+          echo "Command output: ${PR_DATA}"
+          echo "Exit code: ${PR_EXIT_CODE}"
+          
+          if [[ $PR_EXIT_CODE -ne 0 ]]; then
             echo "::error::Failed to fetch PR #${PR_NUMBER}: ${PR_DATA}"
             echo "pr_exists=false" >> $GITHUB_OUTPUT
             exit 1
