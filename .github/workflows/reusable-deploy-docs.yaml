@@ -34,7 +34,7 @@ jobs:
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
 
   deploy_ghpages:
-    runs-on: ubuntu-latest #${{ vars.RUNNER }}
+    runs-on: ${{ vars.RUNNER }}
     name: "Build and deploy docs to GitHub Pages"
     permissions:
       contents: write
@@ -130,6 +130,7 @@ jobs:
           export GEOIPS_PACKAGES_DIR="."
           export GEOIPS_OUTDIRS=""
           export GEOIPS_TESTDATA_DIR="" # necessary for GeoIPS to be importable for the docs to build. Just has to be set to *something*
+          ln -s ./geoips_default_branch ./geoips # the CLI *requires* the geoips folder to be named "geoips" so soft linking here
           python3 ./geoips_default_branch/docs/build_docs.py --geoips-docs-path ./current_repo_current_branch/docs --repo-path ./geoips_default_branch $run_on_package 
           ret=$?
           if [[ "${ret##*:}" != *"0"* ]]; then
