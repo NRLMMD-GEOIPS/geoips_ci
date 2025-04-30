@@ -104,7 +104,8 @@ jobs:
         run: |
           echo "Converting PR #${PR_NUMBER} to draft status..."
           
-          # Try the gh pr ready command with --undo flag to convert to draft
+          # The correct command to convert a PR to draft
+          gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo
           OUTPUT=$(gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo 2>&1)
           EXIT_CODE=$?
           
@@ -113,33 +114,8 @@ jobs:
             echo "success=true" >> $GITHUB_OUTPUT
           else
             echo "::error::Failed to convert PR to draft status: ${OUTPUT}"
-            # Let's try a different approach with a REST API call
-            echo "Attempting to convert PR to draft using REST API..."
-            
-            # Get the PR node ID
-            PR_NODE_ID=$(gh pr view ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --json id --jq '.id')
-            
-            if [[ -n "$PR_NODE_ID" ]]; then
-              # Use the REST API to convert the PR to draft
-              REST_RESULT=$(curl -s -X POST \
-                -H "Authorization: token $GH_TOKEN" \
-                -H "Accept: application/vnd.github.v3+json" \
-                "https://api.github.com/graphql" \
-                -d "{\"query\":\"mutation { convertPullRequestToDraft(input: {pullRequestId: \\\"$PR_NODE_ID\\\"}) { pullRequest { id } } }\"}" 2>&1)
-              
-              REST_EXIT_CODE=$?
-              
-              if [[ $REST_EXIT_CODE -eq 0 && ! "$REST_RESULT" =~ "errors" ]]; then
-                echo "Successfully converted PR to draft status via REST API"
-                echo "success=true" >> $GITHUB_OUTPUT
-              else
-                echo "::error::Failed to convert PR to draft status via REST API: ${REST_RESULT}"
-                echo "success=false" >> $GITHUB_OUTPUT
-              fi
-            else
-              echo "::error::Could not get PR ID for REST API conversion"
-              echo "success=false" >> $GITHUB_OUTPUT
-            fi
+            echo "success=false" >> $GITHUB_OUTPUT
+            # Continue workflow instead of failing to allow comment step
           fi
         shell: bash
 
