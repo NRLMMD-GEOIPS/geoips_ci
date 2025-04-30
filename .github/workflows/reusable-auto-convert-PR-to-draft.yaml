@@ -104,8 +104,8 @@ jobs:
         run: |
           echo "Converting PR #${PR_NUMBER} to draft status..."
           
-          # Attempt to convert PR to draft and capture output
-          OUTPUT=$(gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --draft 2>&1)
+          # The correct command to convert a PR to draft
+          OUTPUT=$(gh pr edit ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --draft 2>&1)
           EXIT_CODE=$?
           
           if [[ $EXIT_CODE -eq 0 ]]; then
