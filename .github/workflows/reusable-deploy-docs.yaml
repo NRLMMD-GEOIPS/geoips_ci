@@ -63,7 +63,7 @@ jobs:
           pip uninstall -y geoips
           # Include test dependency for full documentation
           # lint required for pink (rst linting)
-          pip install --verbose $PWD/geoips_default_branch[doc,lint,test]
+          pip install $PWD/geoips_default_branch[doc,lint,test]
           ret=$?
           echo "${ret}"
           python -c "import geoips; print(geoips.__version__)"
@@ -168,6 +168,7 @@ jobs:
           #   a path to a new directory for the ghpages checkout/push
           #   the name of the current repository
           git config --global user.name "GitHub Actions"
+          git config --global user.email "githubactions@geoips.com"
           ./geoips_default_branch/docs/deploy_pages.sh ./current_repo_current_branch "https://github.com/NRLMMD-GEOIPS" ./ghpages_repo $curr_repo
           ret=$?
           if [[ "${ret##*:}" != *"0"* ]]; then
