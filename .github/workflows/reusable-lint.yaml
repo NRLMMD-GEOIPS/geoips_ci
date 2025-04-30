@@ -8,7 +8,7 @@ on:
         required: true
 
 env:
-  RUNNER_OS: ${{ vars.RUNNER_OS || ‘ubuntu-latest’ }}  # Default value fallback
+  RUNNER_OS: ${{ vars.RUNNER || ‘ubuntu-latest’ }} # Default value fallback
   
 # Assuming the below is in the workflow for an individual repository.
 # # Note we want to run linting all the time - on pull request pushes,
