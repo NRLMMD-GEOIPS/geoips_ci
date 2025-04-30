@@ -104,17 +104,37 @@ jobs:
         run: |
           echo "Converting PR #${PR_NUMBER} to draft status..."
           
-          # The correct command to convert a PR to draft
-          OUTPUT=$(gh pr edit ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --draft 2>&1)
-          EXIT_CODE=$?
+          # Debug: Show available gh commands
+          echo "Available gh pr commands:"
+          gh pr --help
           
-          if [[ $EXIT_CODE -eq 0 ]]; then
-            echo "Successfully converted PR to draft status"
-            echo "success=true" >> $GITHUB_OUTPUT
+          # Debug: Show gh pr edit options
+          echo "gh pr edit options:"
+          gh pr edit --help
+          
+          # Try using the GraphQL API directly as a workaround
+          echo "Attempting to convert PR to draft using GraphQL API..."
+          PR_ID=$(gh pr view ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --json id --jq '.id')
+          
+          if [[ -n "$PR_ID" ]]; then
+            # Use the GraphQL API to convert the PR to draft
+            QUERY='mutation ConvertToDraft($prId: ID!) { convertPullRequestToDraft(input: {pullRequestId: $prId}) { pullRequest { isDraft } } }'
+            
+            RESULT=$(gh api graphql -f query="$QUERY" -f prId="$PR_ID" 2>&1)
+            EXIT_CODE=$?
+            
+            echo "GraphQL API Result: $RESULT"
+            
+            if [[ $EXIT_CODE -eq 0 ]]; then
+              echo "Successfully converted PR to draft status via GraphQL API"
+              echo "success=true" >> $GITHUB_OUTPUT
+            else
+              echo "::error::Failed to convert PR to draft status via GraphQL API: ${RESULT}"
+              echo "success=false" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "::error::Failed to convert PR to draft status: ${OUTPUT}"
+            echo "::error::Could not get PR ID for GraphQL conversion"
             echo "success=false" >> $GITHUB_OUTPUT
-            # Continue workflow instead of failing to allow comment step
           fi
         shell: bash
 
