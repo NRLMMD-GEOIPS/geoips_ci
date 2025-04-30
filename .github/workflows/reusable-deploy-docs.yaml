@@ -172,8 +172,18 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
+          # it will fail if it exists - so remove just in case
           if [[ -d ./ghpages_repo ]]; then
-              # ... (your existing rm block) ...
+              echo "::group::remove_ghpages_before"
+              echo "Remove ghpages_repo before deploy"
+              echo "rm -rfv ./ghpages_repo"
+              rm -rfv ./ghpages_repo
+              echo "::endgroup::"
+              rmret=$?
+              if [[ "${rmret##*:}" != *"0"* ]]; then
+                echo "::error::Removing ./ghpages_repo before deploy ${rmret##*:}"
+                exit 1
+              fi
           fi
           
           # Use the deploy_pages.sh script from the geoips default branch.
@@ -188,6 +198,7 @@ jobs:
             echo "::error::Deploying docs to GitHub pages ${ret##*:}"
             exit 1
           fi
+          
           # Remove ghpages_repo dir after running deploy_pages.sh.
           # deploy_pages.sh will not run if ghpages_repo exists.
           if [[ -d ./ghpages_repo ]]; then
