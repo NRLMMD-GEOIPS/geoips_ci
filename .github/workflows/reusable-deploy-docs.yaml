@@ -134,7 +134,7 @@ jobs:
           ln -s ./geoips_default_branch ./geoips # the CLI *requires* the geoips folder to be named "geoips" so soft linking here
           python3 ./geoips_default_branch/docs/build_docs.py --geoips-docs-path ./geoips_default_branch/docs --repo-path ./current_repo_current_branch "$curr_repo" 
           ret=$?
-          rm -rf ./geoips
+          rm -f ./geoips
           if [[ "${ret##*:}" != *"0"* ]]; then
             echo "::error::Building html docs ${ret##*:}"
             exit 1
