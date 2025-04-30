@@ -167,7 +167,7 @@ jobs:
           #   the geoips repo url, and
           #   a path to a new directory for the ghpages checkout/push
           #   the name of the current repository
-          ./geoips_default_branch/docs/deploy_pages.sh ./current_repo_current_branch $GEOIPS_REPO_URL ./ghpages_repo $curr_repo
+          ./geoips_default_branch/docs/deploy_pages.sh ./ghpages_repo $curr_repo
           ret=$?
           if [[ "${ret##*:}" != *"0"* ]]; then
             echo "::error::Deploying docs to GitHub pages ${ret##*:}"
