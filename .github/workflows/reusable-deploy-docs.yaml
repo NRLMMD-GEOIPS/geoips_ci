@@ -161,14 +161,23 @@ jobs:
                 exit 1
               fi
           fi
+
+          # Configure Git user (good practice)
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Configure Git to use the GITHUB_TOKEN for authentication over HTTPS
+          # This tells git to add an Authorization header to all HTTPS requests to github.com
+          echo "Configuring git authentication..."
+          git config --global http.https://github.com/.extraheader "Authorization: Bearer $GITHUB_TOKEN"
+          echo "Git authentication configured."
+          
           # Use the deploy_pages.sh script from the geoips default branch.
           # Pass in the
           #   current plugin repo path,
           #   the geoips repo url, and
           #   a path to a new directory for the ghpages checkout/push
           #   the name of the current repository
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "githubactions@geoips.com"
           ./geoips_default_branch/docs/deploy_pages.sh ./current_repo_current_branch "https://github.com/NRLMMD-GEOIPS" ./ghpages_repo $curr_repo
           ret=$?
           if [[ "${ret##*:}" != *"0"* ]]; then
