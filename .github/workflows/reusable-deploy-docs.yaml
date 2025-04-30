@@ -131,7 +131,7 @@ jobs:
           export GEOIPS_OUTDIRS=""
           export GEOIPS_TESTDATA_DIR="" # necessary for GeoIPS to be importable for the docs to build. Just has to be set to *something*
           ln -s ./geoips_default_branch ./geoips # the CLI *requires* the geoips folder to be named "geoips" so soft linking here
-          python3 ./geoips_default_branch/docs/build_docs.py --geoips-docs-path ./current_repo_current_branch/docs --repo-path ./geoips_default_branch $run_on_package 
+          python3 ./geoips_default_branch/docs/build_docs.py --geoips-docs-path ./geoips_default_branch/docs --repo-path ./current_repo_current_branch $run_on_package 
           ret=$?
           if [[ "${ret##*:}" != *"0"* ]]; then
             echo "::error::Building html docs ${ret##*:}"
@@ -167,7 +167,7 @@ jobs:
           #   the geoips repo url, and
           #   a path to a new directory for the ghpages checkout/push
           #   the name of the current repository
-          ./geoips_default_branch/docs/deploy_pages.sh ./ghpages_repo $curr_repo
+          ./geoips_default_branch/docs/deploy_pages.sh ./current_repo_current_branch "https://github.com/NRLMMD-GEOIPS" ./ghpages_repo $curr_repo
           ret=$?
           if [[ "${ret##*:}" != *"0"* ]]; then
             echo "::error::Deploying docs to GitHub pages ${ret##*:}"
