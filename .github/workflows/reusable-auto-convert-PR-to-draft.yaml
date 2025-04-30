@@ -66,6 +66,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
           SKIP_LABEL_CHECK: ${{ inputs.skip_label_check }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           # Skip label check if requested
           if [[ "$SKIP_LABEL_CHECK" == "true" ]]; then
@@ -77,8 +78,8 @@ jobs:
           # Check for labels that would exclude this PR from being converted to draft
           echo "Checking PR #${PR_NUMBER} for exclusion labels..."
           
-          # Use jq to check for specific labels
-          EXEMPT_LABEL=$(gh pr view ${PR_NUMBER} --json labels \
+          # Use jq to check for specific labels - make sure to specify the repo
+          EXEMPT_LABEL=$(gh pr view ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --json labels \
             --jq '.labels | map(select(.name == "no-auto-draft")) | length')
           
           if [[ "$EXEMPT_LABEL" -gt 0 ]]; then
@@ -99,11 +100,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           echo "Converting PR #${PR_NUMBER} to draft status..."
           
           # Attempt to convert PR to draft and capture output
-          OUTPUT=$(gh pr ready ${PR_NUMBER} --draft 2>&1)
+          OUTPUT=$(gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --draft 2>&1)
           EXIT_CODE=$?
           
           if [[ $EXIT_CODE -eq 0 ]]; then
@@ -125,6 +127,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
           PR_AUTHOR: ${{ steps.pr_info.outputs.pr_author }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           # Add a helpful comment explaining why the PR was changed to draft
           COMMENT="Hi @${PR_AUTHOR}, this PR has been automatically converted to draft status.
@@ -133,7 +136,7 @@ jobs:
           If you want to prevent this behavior for this PR please add a \`no-auto-draft\` label to this PR.
           *This is an automated action by a CI workflow.*"
           
-          gh pr comment ${PR_NUMBER} --body "$COMMENT"
+          gh pr comment ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --body "$COMMENT"
         shell: bash
 
       - name: Notify on conversion failure
