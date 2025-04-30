@@ -26,55 +26,55 @@ jobs:
       pull-requests: write
       issues: write
       statuses: write
-      
-        - name: Get PR information
-          id: pr_info
-          env:
-            GH_TOKEN: ${{ github.token }}
-            PR_NUMBER: ${{ inputs.pr_number }}
-            GITHUB_REPOSITORY: ${{ github.repository }}
-          run: |
-            echo "Fetching metadata for PR #${PR_NUMBER} in repository ${GITHUB_REPOSITORY}..."
-            
-            gh --version
-            
-            echo "Listing all open PRs:"
-            gh pr list --repo ${GITHUB_REPOSITORY} --limit 5
-            
-            echo "Checking PR via API:"
-            curl -s -H "Authorization: token ${GH_TOKEN}" \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" | jq '.number, .draft, .state'
-            
-            echo "Attempting to fetch PR with gh CLI (with debugging)..."
-            set +e  # Don't exit on error
-            gh pr view ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --json number,draft,author,url
-            PR_EXIT_CODE=$?
-            set -e  # Re-enable exit on error
-            
-            echo "gh pr view exit code: ${PR_EXIT_CODE}"
-            
-            if [[ $PR_EXIT_CODE -ne 0 ]]; then
-              echo "::error::Failed to fetch PR #${PR_NUMBER}"
-              echo "pr_exists=false" >> $GITHUB_OUTPUT
-              exit 1
-            fi
-            
-            PR_DATA=$(gh pr view ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --json number,draft,author,url)
-            
-            # Print the PR data for debugging
-            echo "PR Data: ${PR_DATA}"
-            
-            # Extract PR data from json response
-            IS_DRAFT=$(echo "$PR_DATA" | jq -r '.draft')
-            PR_AUTHOR=$(echo "$PR_DATA" | jq -r '.author.login')
-            PR_URL=$(echo "$PR_DATA" | jq -r '.url')
-            
-            echo "PR #${PR_NUMBER} found. Is draft: ${IS_DRAFT}"
-            echo "pr_exists=true" >> $GITHUB_OUTPUT
-            echo "is_draft=${IS_DRAFT}" >> $GITHUB_OUTPUT
-            echo "pr_author=${PR_AUTHOR}" >> $GITHUB_OUTPUT
-            echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
-          shell: bash
+    steps:
+      - name: Get PR information
+        id: pr_info
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          echo "Fetching metadata for PR #${PR_NUMBER} in repository ${GITHUB_REPOSITORY}..."
+          
+          gh --version
+          
+          echo "Listing all open PRs:"
+          gh pr list --repo ${GITHUB_REPOSITORY} --limit 5
+          
+          echo "Checking PR via API:"
+          curl -s -H "Authorization: token ${GH_TOKEN}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" | jq '.number, .draft, .state'
+          
+          echo "Attempting to fetch PR with gh CLI (with debugging)..."
+          set +e  # Don't exit on error
+          gh pr view ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --json number,draft,author,url
+          PR_EXIT_CODE=$?
+          set -e  # Re-enable exit on error
+          
+          echo "gh pr view exit code: ${PR_EXIT_CODE}"
+          
+          if [[ $PR_EXIT_CODE -ne 0 ]]; then
+            echo "::error::Failed to fetch PR #${PR_NUMBER}"
+            echo "pr_exists=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          PR_DATA=$(gh pr view ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --json number,draft,author,url)
+          
+          # Print the PR data for debugging
+          echo "PR Data: ${PR_DATA}"
+          
+          # Extract PR data from json response
+          IS_DRAFT=$(echo "$PR_DATA" | jq -r '.draft')
+          PR_AUTHOR=$(echo "$PR_DATA" | jq -r '.author.login')
+          PR_URL=$(echo "$PR_DATA" | jq -r '.url')
+          
+          echo "PR #${PR_NUMBER} found. Is draft: ${IS_DRAFT}"
+          echo "pr_exists=true" >> $GITHUB_OUTPUT
+          echo "is_draft=${IS_DRAFT}" >> $GITHUB_OUTPUT
+          echo "pr_author=${PR_AUTHOR}" >> $GITHUB_OUTPUT
+          echo "pr_url=${PR_URL}" >> $GITHUB_OUTPUT
+        shell: bash
         
       - name: Check if PR should be converted to draft
         id: check_pr
