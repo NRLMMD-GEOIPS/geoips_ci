@@ -98,13 +98,14 @@ jobs:
           steps.check_pr.outputs.should_convert == 'true'
         id: convert_to_draft
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}  # Use your PAT instead of github.token
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr_number }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           echo "Converting PR #${PR_NUMBER} to draft status..."
           
           # The correct command to convert a PR to draft
+          gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo
           OUTPUT=$(gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo 2>&1)
           EXIT_CODE=$?
           
