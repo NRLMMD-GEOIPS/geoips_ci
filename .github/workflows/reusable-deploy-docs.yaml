@@ -63,7 +63,7 @@ jobs:
           pip uninstall -y geoips
           # Include test dependency for full documentation
           # lint required for pink (rst linting)
-          pip install $PWD/geoips_default_branch[doc,lint,test]
+          pip install --debug $PWD/geoips_default_branch[doc,lint,test]
           ret=$?
           echo "${ret}"
           python -c "import geoips; print(geoips.__version__)"
