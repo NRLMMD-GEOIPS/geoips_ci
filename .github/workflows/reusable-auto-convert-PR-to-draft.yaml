@@ -104,37 +104,42 @@ jobs:
         run: |
           echo "Converting PR #${PR_NUMBER} to draft status..."
           
-          # Debug: Show available gh commands
-          echo "Available gh pr commands:"
-          gh pr --help
+          # Try the gh pr ready command with --undo flag to convert to draft
+          OUTPUT=$(gh pr ready ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --undo 2>&1)
+          EXIT_CODE=$?
           
-          # Debug: Show gh pr edit options
-          echo "gh pr edit options:"
-          gh pr edit --help
-          
-          # Try using the GraphQL API directly as a workaround
-          echo "Attempting to convert PR to draft using GraphQL API..."
-          PR_ID=$(gh pr view ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --json id --jq '.id')
-          
-          if [[ -n "$PR_ID" ]]; then
-            # Use the GraphQL API to convert the PR to draft
-            QUERY='mutation ConvertToDraft($prId: ID!) { convertPullRequestToDraft(input: {pullRequestId: $prId}) { pullRequest { isDraft } } }'
+          if [[ $EXIT_CODE -eq 0 ]]; then
+            echo "Successfully converted PR to draft status"
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Failed to convert PR to draft status: ${OUTPUT}"
+            # Let's try a different approach with a REST API call
+            echo "Attempting to convert PR to draft using REST API..."
             
-            RESULT=$(gh api graphql -f query="$QUERY" -f prId="$PR_ID" 2>&1)
-            EXIT_CODE=$?
+            # Get the PR node ID
+            PR_NODE_ID=$(gh pr view ${PR_NUMBER} --repo ${GITHUB_REPOSITORY} --json id --jq '.id')
             
-            echo "GraphQL API Result: $RESULT"
-            
-            if [[ $EXIT_CODE -eq 0 ]]; then
-              echo "Successfully converted PR to draft status via GraphQL API"
-              echo "success=true" >> $GITHUB_OUTPUT
+            if [[ -n "$PR_NODE_ID" ]]; then
+              # Use the REST API to convert the PR to draft
+              REST_RESULT=$(curl -s -X POST \
+                -H "Authorization: token $GH_TOKEN" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/graphql" \
+                -d "{\"query\":\"mutation { convertPullRequestToDraft(input: {pullRequestId: \\\"$PR_NODE_ID\\\"}) { pullRequest { id } } }\"}" 2>&1)
+              
+              REST_EXIT_CODE=$?
+              
+              if [[ $REST_EXIT_CODE -eq 0 && ! "$REST_RESULT" =~ "errors" ]]; then
+                echo "Successfully converted PR to draft status via REST API"
+                echo "success=true" >> $GITHUB_OUTPUT
+              else
+                echo "::error::Failed to convert PR to draft status via REST API: ${REST_RESULT}"
+                echo "success=false" >> $GITHUB_OUTPUT
+              fi
             else
-              echo "::error::Failed to convert PR to draft status via GraphQL API: ${RESULT}"
+              echo "::error::Could not get PR ID for REST API conversion"
               echo "success=false" >> $GITHUB_OUTPUT
             fi
-          else
-            echo "::error::Could not get PR ID for GraphQL conversion"
-            echo "success=false" >> $GITHUB_OUTPUT
           fi
         shell: bash
 
