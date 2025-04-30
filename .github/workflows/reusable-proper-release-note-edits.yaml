@@ -19,7 +19,7 @@ on:
 #   # Allows run of this workflow manually from the Actions tab
 #   workflow_dispatch:
 env:
-  RUNNER_OS: ${{ vars.RUNNER_OS || ‘ubuntu-latest’ }}  # Default value fallback
+  RUNNER_OS: ${{ vars.RUNNER || ‘ubuntu-latest’ }} # Default value fallback
 
 defaults:
   run:
