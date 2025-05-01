@@ -18,16 +18,6 @@ on:
       token:
         required: true
 
-# Assuming this is in the plugin repo's workflow file.
-# on:
-#   # triggers the workflow on published release
-#   releases:
-#     types:
-#       - published
-#   # allows run of this workflow manually from the actions tab
-#   # must be merged to default branch before it will be available to manually run.
-#   workflow_dispatch:
-
 jobs:
   print-variables:
     name: Print variables
@@ -40,9 +30,9 @@ jobs:
       contents: write
     steps:
       - name: Setup Python
-        uses: actions/setup-python@v4 # v4is the latest for setup-python
+        uses: actions/setup-python@v5 # v5 is the latest for setup-python
         with:
-          python-version: "pypy-3.10"  # I believe 3.10 is the latest for actions
+          python-version: "3.10"
           check-latest: true
 
       - name: Update pip
@@ -63,7 +53,7 @@ jobs:
           pip uninstall -y geoips
           # Include test dependency for full documentation
           # lint required for pink (rst linting)
-          pip install $PWD/geoips_default_branch[doc,lint,test]
+          pip install "$PWD/geoips_default_branch[doc,lint,test]"
           ret=$?
           echo "${ret}"
           python -c "import geoips; print(geoips.__version__)"
@@ -76,24 +66,36 @@ jobs:
           token: ${{ secrets.token }}
           path: current_repo_current_branch
 
+      - name: Extract repository name
+        id: repo-name
+        run: |
+          REPO_NAME=$(echo "$GITHUB_REPOSITORY" | sed "s,$GITHUB_REPOSITORY_OWNER/,,")
+          echo "repo_name=$REPO_NAME" >> $GITHUB_OUTPUT
+
+      - name: Determine package name
+        id: package-name
+        env:
+          REPO_NAME: ${{ steps.repo-name.outputs.repo_name }}
+        run: |
+          if [[ "$REPO_NAME" == "template_basic_plugin" ]]; then
+            echo "package_name=my_package" >> $GITHUB_OUTPUT
+          else
+            echo "package_name=$REPO_NAME" >> $GITHUB_OUTPUT
+          fi
+
       - name: pip install geoips plugin repo
+        env:
+          PACKAGE_NAME: ${{ steps.package-name.outputs.package_name }}
+          REPO_NAME: ${{ steps.repo-name.outputs.repo_name }}
         run: |
           which pip
-          curr_repo=`echo "$GITHUB_REPOSITORY" | sed "s,$GITHUB_REPOSITORY_OWNER/,,"`
           # Do not re-install if this is the geoips repo
-          if [[ "$curr_repo" != "geoips" ]]; then
-              # If we are specifically "template_basic_plugin" repo, then we must use
-              # my_package as the package name.  Otherwise the package name matches
-              # the plugin name.
-              run_on_package=$curr_repo
-              if [[ "$curr_repo" == "template_basic_plugin" ]]; then
-                run_on_package=my_package
-              fi
-              pip uninstall -y $run_on_package
-              pip install -v $PWD/current_repo_current_branch
+          if [[ "$REPO_NAME" != "geoips" ]]; then
+              pip uninstall -y "$PACKAGE_NAME"
+              pip install -v "$PWD/current_repo_current_branch"
               ret=$?
               echo "${ret}"
-              python -c "import $run_on_package; print($run_on_package.__version__)"
+              python -c "import $PACKAGE_NAME; print($PACKAGE_NAME.__version__)"
           fi
 
       - name: create_plugin_registries
@@ -105,9 +107,12 @@ jobs:
           echo "${ret}"
 
       - name: Run build docs
+        env:
+          PACKAGE_NAME: ${{ steps.package-name.outputs.package_name }}
         run: |
           which pip
           echo "Build html docs"
+          
           # Ie, get 'recenter_tc' out of 'NRLMMD-GEOIPS/recenter_tc'
           curr_repo=`echo "$GITHUB_REPOSITORY" | sed "s,$GITHUB_REPOSITORY_OWNER/,,"`
           # Call build_docs.sh from the geoips default branch
@@ -116,7 +121,6 @@ jobs:
           #   the name of the current repo,
           #   "html_pdf" to indicate producing both html and pdf output, and
           #   the path to the docs template directory in the geoips default branch.
-
           # If we are specifically "template_basic_plugin" repo, then we must use
           # my_package as the package name.  Otherwise the package name matches
           # the plugin name.
@@ -124,22 +128,29 @@ jobs:
           if [[ "$curr_repo" == "template_basic_plugin" ]]; then
             run_on_package=my_package
           fi
-          # Note pdf build failing right now - temporarily only produce html so it works
-          # ./geoips_default_branch/docs/build_docs.sh ./current_repo_current_branch $curr_repo html_pdf ./geoips_default_branch/docs
-          ./geoips_default_branch/docs/build_docs.sh ./current_repo_current_branch $run_on_package html_only ./geoips_default_branch/docs
+          export GEOIPS_PACKAGES_DIR="."
+          export GEOIPS_OUTDIRS=""
+          export GEOIPS_TESTDATA_DIR="" # necessary for GeoIPS to be importable for the docs to build. Just has to be set to *something*
+          ln -s ./geoips_default_branch ./geoips # the CLI *requires* the geoips folder to be named "geoips" so soft linking here
+          python3 ./geoips_default_branch/docs/build_docs.py --geoips-docs-path ./geoips_default_branch/docs --repo-path ./current_repo_current_branch "$curr_repo" 
           ret=$?
+          rm -f ./geoips
           if [[ "${ret##*:}" != *"0"* ]]; then
             echo "::error::Building html docs ${ret##*:}"
             exit 1
           fi
+
       - name: Run deploy docs
+        env:
+          REPO_NAME: ${{ steps.repo-name.outputs.repo_name }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           which pip
           echo "Deploy docs to github pages"
+          
           # GITHUB_REPOSITORY, GITHUB_REPOSITORY_OWNER, and GITHUB_SERVER_URL are all
           # standard github variables defined for every github actions run.
           # Ie, get 'recenter_tc' out of 'NRLMMD-GEOIPS/recenter_tc'
-          curr_repo=`echo "$GITHUB_REPOSITORY" | sed "s,$GITHUB_REPOSITORY_OWNER/,,"`
           # ie, https://github.com/NRLMMD-GEOIPS
           GEOIPS_REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY_OWNER"
           # Remove ghpages_repo dir if it exists.
@@ -156,20 +167,45 @@ jobs:
                 exit 1
               fi
           fi
+
+          echo "Configuring Git for authentication..."
+          # Use the GITHUB_TOKEN for authentication
+          # This replaces any https://github.com/ URL with an authenticated one
+          GH_HOST=$(echo "$GITHUB_SERVER_URL" | sed 's#^https://##')
+          git config --global url."https://x-access-token:$GITHUB_TOKEN@${GH_HOST}/".insteadOf "https://${GH_HOST}/"
+
+          # Set identity to a commonly used "bot" like value, will give us a neat github actions logo in our git commit history
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # it will fail if it exists - so remove just in case
+          if [[ -d ./ghpages_repo ]]; then
+              echo "::group::remove_ghpages_before"
+              echo "Remove ghpages_repo before deploy"
+              echo "rm -rfv ./ghpages_repo"
+              rm -rfv ./ghpages_repo
+              echo "::endgroup::"
+              rmret=$?
+              if [[ "${rmret##*:}" != *"0"* ]]; then
+                echo "::error::Removing ./ghpages_repo before deploy ${rmret##*:}"
+                exit 1
+              fi
+          fi
+          
           # Use the deploy_pages.sh script from the geoips default branch.
           # Pass in the
           #   current plugin repo path,
           #   the geoips repo url, and
           #   a path to a new directory for the ghpages checkout/push
           #   the name of the current repository
-          ./geoips_default_branch/docs/deploy_pages.sh ./current_repo_current_branch $GEOIPS_REPO_URL ./ghpages_repo $curr_repo
+          ./geoips_default_branch/docs/deploy_pages.sh ./current_repo_current_branch "$GEOIPS_REPO_URL" ./ghpages_repo "$REPO_NAME" 
           ret=$?
           if [[ "${ret##*:}" != *"0"* ]]; then
             echo "::error::Deploying docs to GitHub pages ${ret##*:}"
             exit 1
           fi
+          
           # Remove ghpages_repo dir after running deploy_pages.sh.
-          # deploy_pages.sh will not run if ghpages_repo exists.
           if [[ -d ./ghpages_repo ]]; then
               echo "::group::remove_ghpages_after"
               echo "Remove ghpages_repo after deploy"
