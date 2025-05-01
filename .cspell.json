@@ -378,7 +378,7 @@
     // Allow compound words (e.g., "hardcode" if "hard" and "code" are known)
     "allowCompoundWords": true,
     // Specify character sequences that should always be treated as word separators
-    "wordSeparators": "./\\()\"'-:,.;<>~!@#$%^&*|+=[]{}`~?",
+    "wordSeparators": "./\\()\"-:,.;<>~!@#$%^&*|+=[]{}`~?",
 
     // File types to check (if not inferred automatically)
     "enableFiletypes": [
