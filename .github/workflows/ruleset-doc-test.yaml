@@ -37,8 +37,8 @@ jobs:
     # are not pip installable, so do not attempt to run.
     if: >
       !contains(github.event.repository.name, 'test_data_') &&
-      !github.event.repository.name == 'geoips_ci' &&
-      !github.event.repository.name == '.github'
+      github.event.repository.name != 'geoips_ci' &&
+      github.event.repository.name != '.github'
     permissions:
       contents: write
       packages: write
