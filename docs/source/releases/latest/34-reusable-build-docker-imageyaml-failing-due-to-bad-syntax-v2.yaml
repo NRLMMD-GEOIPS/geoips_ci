@@ -1,0 +1,18 @@
+bug fix:
+- title: 'Add ".env" to environment variable references'
+  description: 'Added ".env" to environment variable references where needed.'
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - '.github/workflows/reusable-build-docker-image.yaml'
+  related-issue:
+    number: 34
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2025-05-08
+    finish: 2025-05-08
