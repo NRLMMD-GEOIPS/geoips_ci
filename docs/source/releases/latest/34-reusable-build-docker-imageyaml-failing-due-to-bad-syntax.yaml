@@ -1,0 +1,20 @@
+bug fix:
+- title: 'Fix bad variable references outside run blocks'
+  description: |
+    Some uses of DOCKER_REGISTRY and DOCKER_USER used the wrong syntax
+    outside of run blocks. This updates them from ${VAR} to ${{ VAR }}.
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - '.github/workflows/reusable-build-docker-image.yaml'
+  related-issue:
+    number: 34
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 20250508
+    finish: 20250508
