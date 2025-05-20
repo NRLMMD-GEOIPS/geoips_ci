@@ -1,0 +1,20 @@
+bug fix:
+- title: 'Fix bad variable references outside run blocks'
+  description: |
+    Some uses of DOCKER_REGISTRY and DOCKER_USER used the wrong syntax
+    outside of run blocks. This updates them to use double braces instead of single.
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - '.github/workflows/reusable-build-docker-image.yaml'
+  related-issue:
+    number: 34
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 05/08/2025
+    finish: 05/08/2025

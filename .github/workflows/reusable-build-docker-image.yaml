@@ -164,8 +164,8 @@ jobs:
         # https://github.com/docker/login-action/commit/9780b0c442fbb1117ed29e0efdff1e18412f7567
         uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3 / v3.3.0
         with:
-          registry: ${DOCKER_REGISTRY}
-          username: ${DOCKER_REGISTRY_USER}
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_REGISTRY_USER }}
           password: ${{ secrets.docker_token }}
 
       # This cache allows the second push below when on the default branch
