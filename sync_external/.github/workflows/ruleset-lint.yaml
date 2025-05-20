@@ -17,3 +17,11 @@ jobs:
       contents: read
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}
+  spell-check:
+    name: Spell Check Changed Files
+    # You do not appear to be able to use variables in the "uses" field.
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-cspell-spell-checking.yaml@main
+    permissions:
+      contents: read
+    secrets:
+      token: ${{ secrets.GITHUB_TOKEN }}
