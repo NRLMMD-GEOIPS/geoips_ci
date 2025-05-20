@@ -1,0 +1,18 @@
+continuous integration:
+- title: 'Add spell checking on modified files'
+  description: 'This adds spell checking using CSpell to the CI but only on files modified in the PR in question. This also adds a somewhat comprehensive set of ignored/add-to-dictionary words, and regexes for METOC/data/python/bash things to prevent false positives.'
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - ''
+  related-issue:
+    number: 26
+    repo_url: ''
+  date:
+    start: null
+    finish: null
