@@ -35,7 +35,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5 # v5 is the latest for setup-python
         with:
-          python-version: "3.10"
+          python-version: "3.11"
           check-latest: true
 
       - name: Update pip
