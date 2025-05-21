@@ -1,6 +1,6 @@
 bug fix:
 - title: 'Make spellcheck lint callable (part two)'
-  description: 'Add missing token requirement to cspell action.'
+  description: 'Add missing token requirement to cspell action and pass correct permissions from ruleset file.'
   files:
     modified:
     - '.github/workflows/reusable-cspell-spell-checking.yaml'
