@@ -20,7 +20,7 @@ jobs:
   spell-check:
     name: Spell Check Changed Files
     # You do not appear to be able to use variables in the "uses" field.
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-cspell-spell-checking.yaml@42-fix-token-issues-with-cspell-ruleset
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-cspell-spell-checking.yaml@main
     permissions:
       contents: read
       pull-requests: read
