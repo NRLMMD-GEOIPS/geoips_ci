@@ -1,123 +1,14 @@
-bug fix:
-- title: ''
-  description: ''
-  files:
-    deleted:
-    - ''
-    moved:
-    - ''
-    added:
-    - ''
-    modified:
-    - ''
-  related-issue:
-    number: null
-    repo_url: ''
-  date:
-    start: null
-    finish: null
-enhancement:
-- title: ''
-  description: ''
-  files:
-    deleted:
-    - ''
-    moved:
-    - ''
-    added:
-    - ''
-    modified:
-    - ''
-  related-issue:
-    number: null
-    repo_url: ''
-  date:
-    start: null
-    finish: null
-deprecation:
-- title: ''
-  description: ''
-  files:
-    deleted:
-    - ''
-    moved:
-    - ''
-    added:
-    - ''
-    modified:
-    - ''
-  related-issue:
-    number: null
-    repo_url: ''
-  date:
-    start: null
-    finish: null
-removal:
-- title: ''
-  description: ''
-  files:
-    deleted:
-    - ''
-    moved:
-    - ''
-    added:
-    - ''
-    modified:
-    - ''
-  related-issue:
-    number: null
-    repo_url: ''
-  date:
-    start: null
-    finish: null
-performance:
-- title: ''
-  description: ''
-  files:
-    deleted:
-    - ''
-    moved:
-    - ''
-    added:
-    - ''
-    modified:
-    - ''
-  related-issue:
-    number: null
-    repo_url: ''
-  date:
-    start: null
-    finish: null
-documentation:
-- title: ''
-  description: ''
-  files:
-    deleted:
-    - ''
-    moved:
-    - ''
-    added:
-    - ''
-    modified:
-    - ''
-  related-issue:
-    number: null
-    repo_url: ''
-  date:
-    start: null
-    finish: null
 continuous integration:
-- title: ''
-  description: ''
+- title: 'Add GitHub Action for Automated Issue Creation from PR Comments'
+  description: >
+    Implemented a new GitHub Actions workflow
+    triggered by PR review comments. This action parses comments for a specific trigger phrase
+    ("please open an issue") and, if found, creates a GitHub issue and links it back
+    to the comment and PR.
   files:
-    deleted:
-    - ''
-    moved:
-    - ''
     added:
-    - ''
-    modified:
-    - ''
+    - '.github/workflows/.github/.github/workflows/reusable-create-issue-from-comment.yaml'
+    - '.github/workflows/.github/.github/workflows/ruleset-create-issue-from-comment.yaml'
   related-issue:
     number: null
     repo_url: ''
