@@ -9,7 +9,7 @@ permissions:
   issues: write      # Needed for createIssue
 
 jobs:
-  create-issue-from-comment: # Renamed job for clarity
+  create-issue-from-comment:
     runs-on: ubuntu-latest
     if: contains(github.event.comment.body, 'please open an issue')
     steps:
@@ -19,7 +19,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            // Input validation (Issue #8 in original)
             if (!context.payload.pull_request || !context.payload.comment) {
               console.log('Missing required payload data for creating an issue.');
               // This return will make the step succeed but with success:false,
@@ -36,28 +35,27 @@ jobs:
             const commentUrl = context.payload.comment.html_url;
             const commentBody = context.payload.comment.body;
             const commentPath = context.payload.comment.path;
-            // Fix for comment position property (Issue #1 in original)
-            const commentLine = context.payload.comment.line || 
-                               context.payload.comment.original_line || 
+            const commentLine = context.payload.comment.line ||
+                               context.payload.comment.original_line ||
                                'Unknown';
             const commentUser = context.payload.comment.user.login;
             const commentId = context.payload.comment.id;
-            
+
             // Create issue title
             const issueTitle = `[PR #${prNumber}] ${prTitle} - Incomplete Item`;
-            
+
             let commentThread = '';
             try {
-              // Get ALL review comments for this PR using pagination (Addresses Issue #1)
+              // Get ALL review comments for this PR using pagination
               const allComments = await github.paginate(github.rest.pulls.listReviewComments, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: prNumber
               });
-              
+
               let relatedComments = [];
               const currentComment = context.payload.comment;
-              
+
               if (currentComment.in_reply_to_id) {
                 const originalComment = allComments.find(c => c.id === currentComment.in_reply_to_id);
                 if (originalComment) {
@@ -76,10 +74,10 @@ jobs:
                   allComments.filter(c => c.in_reply_to_id === currentComment.id)
                 );
               }
-              
+
               relatedComments = [...new Map(relatedComments.map(c => [c.id, c])).values()]
                 .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-              
+
               if (relatedComments.length > 0) {
                 commentThread = '### Comment Thread\n\n';
                 for (const comment of relatedComments) {
@@ -97,35 +95,35 @@ jobs:
               commentThread += `**@${commentUser}** [commented](${commentUrl}) on \`${commentPath}\`:\n`;
               commentThread += `> ${commentBody.replace(/\n/g, '\n> ')}\n\n`;
             }
-            
+
             const issueBody = `
             ## Issue created from PR review comment
-            
+
             This issue was automatically created from a review comment in [PR #${prNumber}](${context.payload.pull_request.html_url}).
-            
+
             ### Details
             - **File**: \`${commentPath}\`
             - **Line**: ${commentLine}
             - **PR Author**: @${prAuthor}
             - **Comment Author**: @${commentUser}
-            
+
             ${commentThread}
-            
+
             [View the original comment](${commentUrl})
             `;
-            
+
             try {
               const issue = await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 title: issueTitle,
                 body: issueBody,
-                labels: ['incomplete issue'], # have to add to each repo or this will fail
-                assignees: [prAuthor] 
+                labels: ['incomplete issue'], // must be present on the repo or this will fail
+                assignees: [prAuthor]
               });
-              
+
               console.log(`Created issue #${issue.data.number}`);
-              
+
               return {
                 success: true,
                 issue_number: issue.data.number,
@@ -141,21 +139,21 @@ jobs:
             }
 
       - name: Comment on PR review with issue link
-        if: fromJSON(steps.create-issue.outputs.result).success
+        if: fromJSON(steps.create-issue.outputs.result).success # This needs fromJSON as outputs.result is a string
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const result = JSON.parse(steps.create-issue.outputs.result);
-            
+            const result = ${{ steps.create-issue.outputs.result }}; // Embeds JSON string as JS object literal
+
             if (!result.issue_number || !result.issue_url) {
               console.log('Missing issue information in result, cannot comment on PR.');
               // If this happens, it's an internal logic error or unexpected output
               // from the previous step. Let the step succeed to avoid confusing error states
               // if the issue was actually created but info wasn't passed correctly.
-              return; 
+              return;
             }
-            
+
             try {
               await github.rest.pulls.createReviewComment({
                 owner: context.repo.owner,
@@ -167,6 +165,6 @@ jobs:
               console.log(`Successfully replied to comment ${context.payload.comment.id} in PR #${context.payload.pull_request.number}`);
             } catch (error) {
               console.error('Error replying to PR review comment:', error);
-              // Re-throw the error to make this step fail (Addresses Issue #8)
-              throw error; 
+              // Re-throw the error to make this step fail
+              throw error;
             }
