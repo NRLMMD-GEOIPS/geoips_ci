@@ -8,7 +8,7 @@ jobs:
   trigger-issue-creation:
     name: Check Comment and Trigger Issue Creation
     if: contains(toLower(github.event.comment.body), 'please open an issue')
-    uses: NRL-MMD/geoips_ci/.github/workflows/reusable-create-issue-from-comment.yaml@Comment-to-issue-automagical
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-create-issue-from-comment.yaml@Comment-to-issue-automagical
     permissions:
       contents: read
     secrets:
