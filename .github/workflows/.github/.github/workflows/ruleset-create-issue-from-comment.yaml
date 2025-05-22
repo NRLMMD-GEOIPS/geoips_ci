@@ -3,13 +3,14 @@ name: Handle PR Comment for Issue Creation
 on:
   pull_request_review_comment:
     types: [created]
-    
+
 jobs:
   trigger-issue-creation:
     name: Check Comment and Trigger Issue Creation
     if: contains(toLower(github.event.comment.body), 'please open an issue')
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-create-issue-from-comment.yaml@Comment-to-issue-automagical
     permissions:
-      contents: read
+      contents: read 
+      issues: write
     secrets:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
