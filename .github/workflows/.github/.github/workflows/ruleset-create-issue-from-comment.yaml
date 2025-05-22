@@ -11,6 +11,7 @@ jobs:
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-create-issue-from-comment.yaml@Comment-to-issue-automagical
     permissions:
       contents: read 
-      issues: write
+      pull-requests: write # Needed because the reusable workflow will comment back on the PR
+      issues: write      # Needed because the reusable workflow will create an issue
     secrets:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
