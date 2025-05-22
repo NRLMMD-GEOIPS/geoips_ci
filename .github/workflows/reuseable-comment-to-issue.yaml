@@ -3,6 +3,7 @@ name: Create Issue from PR Review Comment
 on:
   pull_request_review_comment:
     types: [created]
+  workflow_call:
 
 permissions:
   pull-requests: write # Needed for createReviewComment
