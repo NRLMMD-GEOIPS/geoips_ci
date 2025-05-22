@@ -244,7 +244,7 @@ jobs:
               if (testOutputFromPreviousStep === "This is a test string output") {
                 core.warning('However, the test_output was received correctly. Problem might be with the main "result" output content or its stringification.');
               } else {
-                core.warning('The test_output was ALSO not received or empty. This suggests a more fundamental problem with outputs.');
+                core.warning('The test_output was ALSO not received or empty. This suggests a problem with outputs.');
               }
               return;
             }
