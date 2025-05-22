@@ -1,4 +1,4 @@
-name: Create Issue from PR Review Comment
+name: Create Issue from PR Review Comment (Reusable)
 
 on:
   pull_request_review_comment:
@@ -12,22 +12,29 @@ permissions:
 jobs:
   create-issue-from-comment:
     runs-on: ubuntu-latest
+    # This 'if' condition is crucial: it ensures the job only runs
+    # when the comment contains the trigger phrase.
     if: contains(github.event.comment.body, 'please open an issue')
     steps:
       - name: Create issue with comment thread
         id: create-issue
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is passed by the caller
           script: |
+            // Your existing script here...
+            // Ensure it handles the case where github.event.comment might not exist
+            // if triggered via workflow_call without the right context, though
+            // the caller is expected to trigger on pull_request_review_comment.
+
             if (!context.payload.pull_request || !context.payload.comment) {
-              console.log('Missing required payload data for creating an issue.');
+              console.log('Missing required payload data (pull_request or comment) for creating an issue.');
               // This return will make the step succeed but with success:false,
               // so the next step won't run due to its 'if' condition.
-              return {
-                success: false,
-                error: 'Missing required payload data'
-              };
+              // It's important because if this reusable workflow is called
+              // from an event that doesn't have this context, it shouldn't fail loudly.
+              core.setOutput('result', JSON.stringify({ success: false, error: 'Missing required payload data' }));
+              return;
             }
 
             const prNumber = context.payload.pull_request.number;
@@ -47,7 +54,6 @@ jobs:
 
             let commentThread = '';
             try {
-              // Get ALL review comments for this PR using pagination
               const allComments = await github.paginate(github.rest.pulls.listReviewComments, {
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -65,8 +71,6 @@ jobs:
                     allComments.filter(c => c.in_reply_to_id === originalComment.id)
                   );
                 } else {
-                  // If original comment of reply not found (e.g. deleted, or not in 'allComments' - unlikely with paginate),
-                  // fallback to just the current comment.
                   relatedComments.push(currentComment);
                 }
               } else {
@@ -82,7 +86,7 @@ jobs:
               if (relatedComments.length > 0) {
                 commentThread = '### Comment Thread\n\n';
                 for (const comment of relatedComments) {
-                  const commentHtmlUrl = comment.html_url || commentUrl; // Fallback to current comment's URL if somehow missing
+                  const commentHtmlUrl = comment.html_url || commentUrl;
                   const commentUserLogin = comment.user?.login || 'Unknown User';
                   const commentBodyText = comment.body || 'No content';
                   commentThread += `**@${commentUserLogin}** [commented](${commentHtmlUrl}) on \`${comment.path}\`:\n`;
@@ -91,7 +95,6 @@ jobs:
               }
             } catch (error) {
               console.log('Error fetching/processing comment thread:', error);
-              // Fallback to just the triggering comment if thread fetching fails
               commentThread = '### Triggering Comment\n\n';
               commentThread += `**@${commentUser}** [commented](${commentUrl}) on \`${commentPath}\`:\n`;
               commentThread += `> ${commentBody.replace(/\n/g, '\n> ')}\n\n`;
@@ -119,39 +122,36 @@ jobs:
                 repo: context.repo.repo,
                 title: issueTitle,
                 body: issueBody,
-                labels: ['incomplete issue'], // must be present on the repo or this will fail
+                labels: ['incomplete issue'],
                 assignees: [prAuthor]
               });
 
               console.log(`Created issue #${issue.data.number}`);
-
-              return {
+              core.setOutput('result', JSON.stringify({
                 success: true,
                 issue_number: issue.data.number,
                 issue_url: issue.data.html_url
-              };
+              }));
             } catch (error) {
               console.error('Error creating issue:', error);
-              // This return will make the step succeed but with success:false ... love that that is an option
-              return {
+              core.setOutput('result', JSON.stringify({
                 success: false,
                 error: `Failed to create issue: ${error.message}`
-              };
+              }));
             }
 
       - name: Comment on PR review with issue link
-        if: fromJSON(steps.create-issue.outputs.result).success # This needs fromJSON as outputs.result is a string
-        uses: actions/github-script@v6
+        # The output 'result' is a JSON string. We need to parse it.
+        # fromJSON is available in GitHub Actions expressions.
+        if: fromJSON(steps.create-issue.outputs.result).success
+        uses: actions/github-script@v7 # Use a more recent version if available
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const result = ${{ steps.create-issue.outputs.result }}; // Embeds JSON string as JS object literal
+            const result = ${{ steps.create-issue.outputs.result }}; // This embeds the JSON string as a JS object literal
 
             if (!result.issue_number || !result.issue_url) {
               console.log('Missing issue information in result, cannot comment on PR.');
-              // If this happens, it's an internal logic error or unexpected output
-              // from the previous step. Let the step succeed to avoid confusing error states
-              // if the issue was actually created but info wasn't passed correctly.
               return;
             }
 
@@ -166,6 +166,5 @@ jobs:
               console.log(`Successfully replied to comment ${context.payload.comment.id} in PR #${context.payload.pull_request.number}`);
             } catch (error) {
               console.error('Error replying to PR review comment:', error);
-              // Re-throw the error to make this step fail
-              throw error;
+              throw error; // Make the step fail
             }
