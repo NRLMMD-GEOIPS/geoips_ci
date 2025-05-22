@@ -74,7 +74,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-
             // Access data from environment variables (populated from inputs)
             const prNumber = parseInt(process.env.PR_NUMBER);
             const prTitle = process.env.PR_TITLE;
@@ -94,7 +93,7 @@ jobs:
 
             if (!prNumber || !commentId) {
               core.setFailed('Missing required input data (pr_number or comment_id).');
-              return;
+              return { success: false, error: 'Missing required input data (pr_number or comment_id).' };
             }
 
             const issueTitle = `[PR #${prNumber}] ${prTitle} - Incomplete Item from comment`;
@@ -194,30 +193,21 @@ jobs:
               core.info(`Extracted issue_number: ${issueNumber} (type: ${typeof issueNumber})`);
               core.info(`Extracted issue_url: ${issueUrl} (type: ${typeof issueUrl})`);
 
-              const outputPayload = {
+              // Set a test output to verify outputs are working
+              core.setOutput('test_output', "This is a test string output");
+              core.info("core.setOutput('test_output', ...) was called.");
+
+              // Return the payload directly - this will be automatically set as the 'result' output
+              return {
                 success: true,
                 issue_number: issueNumber,
                 issue_url: issueUrl
               };
-              const jsonStringToSet = JSON.stringify(outputPayload);
-
-              core.info(`GITHUB_OUTPUT env var: ${process.env.GITHUB_OUTPUT}`); // Check if GITHUB_OUTPUT is set
-              core.info(`JSON string to be set as output 'result': "${jsonStringToSet}"`); // Log with quotes to see if it's truly empty
-
-              if (jsonStringToSet === undefined || jsonStringToSet === null || typeof jsonStringToSet !== 'string' || jsonStringToSet.trim() === '') {
-                core.warning(`The JSON string for output is empty, null, undefined, or not a string before calling setOutput! Value: "${jsonStringToSet}", Type: ${typeof jsonStringToSet}`);
-              }
-
-              core.setOutput('result', jsonStringToSet);
-              core.info("core.setOutput('result', ...) was called."); // Confirmation
-
-              // As a fallback/test, set a simple string output too
-              core.setOutput('test_output', "This is a test string output");
-              core.info("core.setOutput('test_output', ...) was called.");
 
             } catch (error) {
               console.error('Error creating issue or setting output:', error);
               core.setFailed(`Failed to create issue or set output: ${error.message}`);
+              return { success: false, error: error.message };
             }
 
       - name: Comment on PR review with issue link
@@ -233,12 +223,11 @@ jobs:
             const resultJson = '${{ steps.create-issue.outputs.result }}';
             const testOutputFromPreviousStep = '${{ steps.create-issue.outputs.test_output }}';
 
-            core.info(`Received resultJson: "${resultJson}"`); // Log with quotes
-            core.info(`Received test_output: "${testOutputFromPreviousStep}"`); // Log with quotes
+            core.info(`Received resultJson: "${resultJson}"`);
+            core.info(`Received test_output: "${testOutputFromPreviousStep}"`);
 
             if (!resultJson) {
               core.warning('Result from create-issue step is empty. Cannot comment on PR.');
-              // Optionally, you can add more checks here based on test_output
               if (testOutputFromPreviousStep === "This is a test string output") {
                 core.warning('However, the test_output was received correctly. Problem might be with the main "result" output content or its stringification.');
               } else {
@@ -250,8 +239,6 @@ jobs:
             const result = JSON.parse(resultJson);
 
             if (!result.success || !result.issue_number || !result.issue_url) {
-              // If success was false, the 'if' condition of the step should have prevented this.
-              // This is a fallback or if the 'if' condition is made less strict.
               core.warning('Missing issue information or success:false in result, cannot comment on PR.');
               return;
             }
