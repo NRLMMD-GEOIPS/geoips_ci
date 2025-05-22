@@ -1,4 +1,4 @@
-name: Create Issue from PR Review Comment (Reusable)
+name: Create Issue from PR Review Comment
 
 on:
   pull_request_review_comment:
