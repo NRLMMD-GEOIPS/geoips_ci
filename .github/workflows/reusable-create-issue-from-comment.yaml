@@ -47,9 +47,6 @@ on:
         description: 'The ID of the comment this comment is replying to (if any)'
         required: false
         type: string
-    secrets:
-      GITHUB_TOKEN:
-        required: true
 
 permissions:
   pull-requests: write
@@ -77,8 +74,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const core = require('@actions/core');
-            const github = require('@actions/github');
 
             // Access data from environment variables (populated from inputs)
             const prNumber = parseInt(process.env.PR_NUMBER);
@@ -235,8 +230,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const core = require('@actions/core');
-            const github = require('@actions/github');
             const resultJson = '${{ steps.create-issue.outputs.result }}';
             const testOutputFromPreviousStep = '${{ steps.create-issue.outputs.test_output }}';
 
