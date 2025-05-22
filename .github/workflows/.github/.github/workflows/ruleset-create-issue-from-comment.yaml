@@ -1,7 +1,5 @@
 name: Handle PR Comment for Issue Creation
 
-# This workflow listens for PR review comments.
-# The actual logic to create an issue is in the reusable workflow.
 on:
   pull_request_review_comment:
     types: [created]
@@ -9,11 +7,9 @@ on:
 jobs:
   trigger-issue-creation:
     name: Check Comment and Trigger Issue Creation
-    # This prevents the reusable workflow from being called unnecessarily.
-    # The reusable workflow ALSO has this check, providing a double layer.
-    if: contains(github.event.comment.body, 'please open an issue')
-    uses: NRL-MMD/geoips_ci/.github/workflows/reusable-create-issue-from-comment.yaml@main
+    if: contains(toLower(github.event.comment.body), 'please open an issue')
+    uses: NRL-MMD/geoips_ci/.github/workflows/reusable-create-issue-from-comment.yaml@Comment-to-issue-automagical
     permissions:
-      contents: read # Usually safe default
+      contents: read
     secrets:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
