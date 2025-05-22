@@ -1,7 +1,7 @@
 name: Print variables
 
 env:
-  RUNNER: ${{ vars.RUNNER || ‘ubuntu-latest’ }} # Default value fallback
+  RUNNER: ${{ vars.RUNNER || 'ubuntu-latest' }} # Default value fallback
 
 on:
   workflow_call:
