@@ -1,9 +1,10 @@
 name: Create Issue from PR Review Comment
 
 on:
-  pull_request_review_comment:
-    types: [created]
   workflow_call:
+    secrets:
+      GITHUB_TOKEN:
+        required: true
 
 permissions:
   pull-requests: write # Needed for createReviewComment
@@ -12,7 +13,6 @@ permissions:
 jobs:
   create-issue-from-comment:
     runs-on: ubuntu-latest
-    if: contains(toLower(github.event.comment.body), 'please open an issue')
     steps:
       - name: Create issue with comment thread
         id: create-issue
@@ -20,18 +20,11 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is passed by the caller
           script: |
-            // Your existing script here...
-            // Ensure it handles the case where github.event.comment might not exist
-            // if triggered via workflow_call without the right context, though
-            // the caller is expected to trigger on pull_request_review_comment.
+            // context.payload.comment and context.payload.pull_request
+            // will be populated by the event that triggered the CALLING workflow.
 
             if (!context.payload.pull_request || !context.payload.comment) {
-              console.log('Missing required payload data (pull_request or comment) for creating an issue.');
-              // This return will make the step succeed but with success:false,
-              // so the next step won't run due to its 'if' condition.
-              // It's important because if this reusable workflow is called
-              // from an event that doesn't have this context, it shouldn't fail loudly.
-              core.setOutput('result', JSON.stringify({ success: false, error: 'Missing required payload data' }));
+              core.setFailed('Missing required payload data (pull_request or comment) for creating an issue. This reusable workflow should be called from a pull_request_review_comment event.');
               return;
             }
 
@@ -39,16 +32,15 @@ jobs:
             const prTitle = context.payload.pull_request.title;
             const prAuthor = context.payload.pull_request.user.login;
             const commentUrl = context.payload.comment.html_url;
-            const commentBody = context.payload.comment.body;
+            const commentBody = context.payload.comment.body; // The original comment body
             const commentPath = context.payload.comment.path;
             const commentLine = context.payload.comment.line ||
                                context.payload.comment.original_line ||
-                               'Unknown';
+                               'Unknown'; // original_line for multi-line comments
             const commentUser = context.payload.comment.user.login;
             const commentId = context.payload.comment.id;
 
-            // Create issue title
-            const issueTitle = `[PR #${prNumber}] ${prTitle} - Incomplete Item`;
+            const issueTitle = `[PR #${prNumber}] ${prTitle} - Incomplete Item from comment`;
 
             let commentThread = '';
             try {
@@ -59,32 +51,60 @@ jobs:
               });
 
               let relatedComments = [];
-              const currentComment = context.payload.comment;
+              const currentComment = context.payload.comment; // The triggering comment
+
+              // Find the root comment of the thread
+              let rootComment = currentComment;
+              while (rootComment.in_reply_to_id) {
+                const parent = allComments.find(c => c.id === rootComment.in_reply_to_id);
+                if (parent) {
+                  rootComment = parent;
+                } else {
+                  // Parent not found, break to avoid infinite loop
+                  break;
+                }
+              }
+
+              // Add the root comment
+              relatedComments.push(rootComment);
+
+              // Add all comments that reply to the root comment
+              // And all comments that reply to the current comment (if it's not the root)
+              // This logic can be complex depending on how deep threads you want to capture.
 
               if (currentComment.in_reply_to_id) {
                 const originalComment = allComments.find(c => c.id === currentComment.in_reply_to_id);
                 if (originalComment) {
-                  relatedComments.push(originalComment);
+                  relatedComments.push(originalComment); // Add the direct parent
+                  // Add siblings (other replies to the same parent)
                   relatedComments = relatedComments.concat(
                     allComments.filter(c => c.in_reply_to_id === originalComment.id)
                   );
-                } else {
-                  relatedComments.push(currentComment);
                 }
-              } else {
-                relatedComments.push(currentComment);
+                // Always ensure the current comment is included
+                if (!relatedComments.find(c => c.id === currentComment.id)) {
+                    relatedComments.push(currentComment);
+                }
+              } else { // Current comment is a top-level comment in a thread
+                if (!relatedComments.find(c => c.id === currentComment.id)) {
+                    relatedComments.push(currentComment);
+                }
+                // Add direct replies to the current comment
                 relatedComments = relatedComments.concat(
                   allComments.filter(c => c.in_reply_to_id === currentComment.id)
                 );
               }
 
+
+              // Deduplicate and sort
               relatedComments = [...new Map(relatedComments.map(c => [c.id, c])).values()]
                 .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
 
               if (relatedComments.length > 0) {
                 commentThread = '### Comment Thread\n\n';
                 for (const comment of relatedComments) {
-                  const commentHtmlUrl = comment.html_url || commentUrl;
+                  const commentHtmlUrl = comment.html_url || `https://github.com/${context.repo.owner}/${context.repo.repo}/pull/${prNumber}#discussion_r${comment.id}`;
                   const commentUserLogin = comment.user?.login || 'Unknown User';
                   const commentBodyText = comment.body || 'No content';
                   commentThread += `**@${commentUserLogin}** [commented](${commentHtmlUrl}) on \`${comment.path}\`:\n`;
@@ -93,7 +113,7 @@ jobs:
               }
             } catch (error) {
               console.log('Error fetching/processing comment thread:', error);
-              commentThread = '### Triggering Comment\n\n';
+              commentThread = '### Triggering Comment\n\n'; 
               commentThread += `**@${commentUser}** [commented](${commentUrl}) on \`${commentPath}\`:\n`;
               commentThread += `> ${commentBody.replace(/\n/g, '\n> ')}\n\n`;
             }
@@ -132,24 +152,19 @@ jobs:
               }));
             } catch (error) {
               console.error('Error creating issue:', error);
-              core.setOutput('result', JSON.stringify({
-                success: false,
-                error: `Failed to create issue: ${error.message}`
-              }));
+              core.setFailed(`Failed to create issue: ${error.message}`); // Make the step fail
             }
 
       - name: Comment on PR review with issue link
-        # The output 'result' is a JSON string. We need to parse it.
-        # fromJSON is available in GitHub Actions expressions.
-        if: fromJSON(steps.create-issue.outputs.result).success
-        uses: actions/github-script@v7 # Use a more recent version if available
+        if: fromJSON(steps.create-issue.outputs.result).success && steps.create-issue.outcome == 'success'
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const result = ${{ steps.create-issue.outputs.result }}; // This embeds the JSON string as a JS object literal
+            const result = ${{ steps.create-issue.outputs.result }};
 
             if (!result.issue_number || !result.issue_url) {
-              console.log('Missing issue information in result, cannot comment on PR.');
+              core.setFailed('Missing issue information in result, cannot comment on PR.');
               return;
             }
 
@@ -159,10 +174,13 @@ jobs:
                 repo: context.repo.repo,
                 pull_number: context.payload.pull_request.number,
                 body: `✅ I've created issue #${result.issue_number} to track this item and assigned it to @${context.payload.pull_request.user.login}. [View the issue](${result.issue_url})`,
-                in_reply_to: context.payload.comment.id
+                in_reply_to: context.payload.comment.id // Reply to the original comment
               });
               console.log(`Successfully replied to comment ${context.payload.comment.id} in PR #${context.payload.pull_request.number}`);
             } catch (error) {
               console.error('Error replying to PR review comment:', error);
-              throw error; // Make the step fail
+              // If replying fails, we might not want the whole workflow to fail,
+              // as the issue was still created. Log it, but don't necessarily `throw error;`
+              // unless you consider this a critical failure.
+              core.warning(`Failed to reply to PR comment, but issue #${result.issue_number} was created: ${error.message}`);
             }
