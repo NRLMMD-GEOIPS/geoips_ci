@@ -1,8 +1,12 @@
-name: Handle PR Comment for Issue Creation
+name: Create Issue from PR Review Comment
 
 on:
   pull_request_review_comment:
     types: [created]
+
+permissions:
+  pull-requests: write # Needed for createReviewComment
+  issues: write      # Needed for createIssue
 
 jobs:
   trigger-issue-creation:
