@@ -2,13 +2,58 @@ name: Create Issue from PR Review Comment
 
 on:
   workflow_call:
+    inputs:
+      pr_number:
+        description: 'The pull request number'
+        required: true
+        type: string
+      pr_title:
+        description: 'The pull request title'
+        required: true
+        type: string
+      pr_author_login:
+        description: 'The login of the PR author'
+        required: true
+        type: string
+      pr_html_url:
+        description: 'The HTML URL of the PR'
+        required: true
+        type: string
+      comment_id:
+        description: 'The ID of the review comment'
+        required: true
+        type: string
+      comment_body:
+        description: 'The body of the review comment'
+        required: true
+        type: string
+      comment_html_url:
+        description: 'The HTML URL of the comment'
+        required: true
+        type: string
+      comment_path:
+        description: 'The path of the file commented on'
+        required: true
+        type: string
+      comment_line:
+        description: 'The line number of the comment'
+        required: true
+        type: string 
+      comment_user_login:
+        description: 'The login of the comment author'
+        required: true
+        type: string
+      comment_in_reply_to_id:
+        description: 'The ID of the comment this comment is replying to (if any)'
+        required: false
+        type: string
     secrets:
       GITHUB_TOKEN:
         required: true
 
 permissions:
-  pull-requests: write # Needed for createReviewComment
-  issues: write      # Needed for createIssue
+  pull-requests: write
+  issues: write
 
 jobs:
   create-issue-from-comment:
@@ -17,103 +62,105 @@ jobs:
       - name: Create issue with comment thread
         id: create-issue
         uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_TITLE: ${{ inputs.pr_title }}
+          PR_AUTHOR_LOGIN: ${{ inputs.pr_author_login }}
+          PR_HTML_URL: ${{ inputs.pr_html_url }}
+          COMMENT_ID: ${{ inputs.comment_id }}
+          COMMENT_BODY: ${{ inputs.comment_body }}
+          COMMENT_HTML_URL: ${{ inputs.comment_html_url }}
+          COMMENT_PATH: ${{ inputs.comment_path }}
+          COMMENT_LINE: ${{ inputs.comment_line }}
+          COMMENT_USER_LOGIN: ${{ inputs.comment_user_login }}
+          COMMENT_IN_REPLY_TO_ID: ${{ inputs.comment_in_reply_to_id }}
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }} # GITHUB_TOKEN is passed by the caller
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            // context.payload.comment and context.payload.pull_request
-            // will be populated by the event that triggered the CALLING workflow.
+            const core = require('@actions/core');
+            const github = require('@actions/github'); // octokit client
 
-            if (!context.payload.pull_request || !context.payload.comment) {
-              core.setFailed('Missing required payload data (pull_request or comment) for creating an issue. This reusable workflow should be called from a pull_request_review_comment event.');
+            // Access data from environment variables (populated from inputs)
+            const prNumber = parseInt(process.env.PR_NUMBER);
+            const prTitle = process.env.PR_TITLE;
+            const prAuthor = process.env.PR_AUTHOR_LOGIN;
+            const prHtmlUrl = process.env.PR_HTML_URL;
+            const commentId = parseInt(process.env.COMMENT_ID);
+            const commentBody = process.env.COMMENT_BODY;
+            const commentUrl = process.env.COMMENT_HTML_URL;
+            const commentPath = process.env.COMMENT_PATH;
+            const commentLine = process.env.COMMENT_LINE;
+            const commentUser = process.env.COMMENT_USER_LOGIN;
+            const commentInReplyToId = process.env.COMMENT_IN_REPLY_TO_ID ? parseInt(process.env.COMMENT_IN_REPLY_TO_ID) : null;
+
+            // Repo context is available directly
+            const owner = github.context.repo.owner;
+            const repo = github.context.repo.repo;
+
+            if (!prNumber || !commentId) {
+              core.setFailed('Missing required input data (pr_number or comment_id).');
               return;
             }
-
-            const prNumber = context.payload.pull_request.number;
-            const prTitle = context.payload.pull_request.title;
-            const prAuthor = context.payload.pull_request.user.login;
-            const commentUrl = context.payload.comment.html_url;
-            const commentBody = context.payload.comment.body; // The original comment body
-            const commentPath = context.payload.comment.path;
-            const commentLine = context.payload.comment.line ||
-                               context.payload.comment.original_line ||
-                               'Unknown'; // original_line for multi-line comments
-            const commentUser = context.payload.comment.user.login;
-            const commentId = context.payload.comment.id;
 
             const issueTitle = `[PR #${prNumber}] ${prTitle} - Incomplete Item from comment`;
 
             let commentThread = '';
             try {
               const allComments = await github.paginate(github.rest.pulls.listReviewComments, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
+                owner: owner,
+                repo: repo,
                 pull_number: prNumber
               });
 
-              let relatedComments = [];
-              const currentComment = context.payload.comment; // The triggering comment
+              // Find the full object for the triggering comment from all fetched comments
+              const currentCommentObject = allComments.find(c => c.id === commentId);
 
-              // Find the root comment of the thread
-              let rootComment = currentComment;
-              while (rootComment.in_reply_to_id) {
-                const parent = allComments.find(c => c.id === rootComment.in_reply_to_id);
-                if (parent) {
-                  rootComment = parent;
+              if (!currentCommentObject) {
+                core.warning(`Triggering comment with ID ${commentId} not found in PR comments. Issue will be created with minimal comment data.`);
+                commentThread = '### Triggering Comment\n\n';
+                commentThread += `**@${commentUser}** [commented](${commentUrl}) on \`${commentPath}\`:\n`;
+                commentThread += `> ${commentBody.replace(/\n/g, '\n> ')}\n\n`;
+              } else {
+                let relatedComments = [];
+
+                // Use currentCommentObject for thread logic
+                if (currentCommentObject.in_reply_to_id) {
+                  const originalComment = allComments.find(c => c.id === currentCommentObject.in_reply_to_id);
+                  if (originalComment) {
+                    relatedComments.push(originalComment);
+                    relatedComments = relatedComments.concat(
+                      allComments.filter(c => c.in_reply_to_id === originalComment.id)
+                    );
+                  }
+                  if (!relatedComments.find(c => c.id === currentCommentObject.id)) {
+                      relatedComments.push(currentCommentObject);
+                  }
                 } else {
-                  // Parent not found, break to avoid infinite loop
-                  break;
-                }
-              }
-
-              // Add the root comment
-              relatedComments.push(rootComment);
-
-              // Add all comments that reply to the root comment
-              // And all comments that reply to the current comment (if it's not the root)
-              // This logic can be complex depending on how deep threads you want to capture.
-
-              if (currentComment.in_reply_to_id) {
-                const originalComment = allComments.find(c => c.id === currentComment.in_reply_to_id);
-                if (originalComment) {
-                  relatedComments.push(originalComment); // Add the direct parent
-                  // Add siblings (other replies to the same parent)
+                  if (!relatedComments.find(c => c.id === currentCommentObject.id)) {
+                      relatedComments.push(currentCommentObject);
+                  }
                   relatedComments = relatedComments.concat(
-                    allComments.filter(c => c.in_reply_to_id === originalComment.id)
+                    allComments.filter(c => c.in_reply_to_id === currentCommentObject.id)
                   );
                 }
-                // Always ensure the current comment is included
-                if (!relatedComments.find(c => c.id === currentComment.id)) {
-                    relatedComments.push(currentComment);
-                }
-              } else { // Current comment is a top-level comment in a thread
-                if (!relatedComments.find(c => c.id === currentComment.id)) {
-                    relatedComments.push(currentComment);
-                }
-                // Add direct replies to the current comment
-                relatedComments = relatedComments.concat(
-                  allComments.filter(c => c.in_reply_to_id === currentComment.id)
-                );
-              }
 
+                relatedComments = [...new Map(relatedComments.map(c => [c.id, c])).values()]
+                  .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-              // Deduplicate and sort
-              relatedComments = [...new Map(relatedComments.map(c => [c.id, c])).values()]
-                .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-
-
-              if (relatedComments.length > 0) {
-                commentThread = '### Comment Thread\n\n';
-                for (const comment of relatedComments) {
-                  const commentHtmlUrl = comment.html_url || `https://github.com/${context.repo.owner}/${context.repo.repo}/pull/${prNumber}#discussion_r${comment.id}`;
-                  const commentUserLogin = comment.user?.login || 'Unknown User';
-                  const commentBodyText = comment.body || 'No content';
-                  commentThread += `**@${commentUserLogin}** [commented](${commentHtmlUrl}) on \`${comment.path}\`:\n`;
-                  commentThread += `> ${commentBodyText.replace(/\n/g, '\n> ')}\n\n`;
+                if (relatedComments.length > 0) {
+                  commentThread = '### Comment Thread\n\n';
+                  for (const comment of relatedComments) {
+                    const cmHtmlUrl = comment.html_url || `https://github.com/${owner}/${repo}/pull/${prNumber}#discussion_r${comment.id}`;
+                    const cmUserLogin = comment.user?.login || 'Unknown User';
+                    const cmBodyText = comment.body || 'No content';
+                    commentThread += `**@${cmUserLogin}** [commented](${cmHtmlUrl}) on \`${comment.path}\`:\n`;
+                    commentThread += `> ${cmBodyText.replace(/\n/g, '\n> ')}\n\n`;
+                  }
                 }
               }
             } catch (error) {
               console.log('Error fetching/processing comment thread:', error);
-              commentThread = '### Triggering Comment\n\n'; 
+              commentThread = '### Triggering Comment\n\n';
               commentThread += `**@${commentUser}** [commented](${commentUrl}) on \`${commentPath}\`:\n`;
               commentThread += `> ${commentBody.replace(/\n/g, '\n> ')}\n\n`;
             }
@@ -121,7 +168,7 @@ jobs:
             const issueBody = `
             ## Issue created from PR review comment
 
-            This issue was automatically created from a review comment in [PR #${prNumber}](${context.payload.pull_request.html_url}).
+            This issue was automatically created from a review comment in [PR #${prNumber}](${prHtmlUrl}).
 
             ### Details
             - **File**: \`${commentPath}\`
@@ -136,8 +183,8 @@ jobs:
 
             try {
               const issue = await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
+                owner: owner,
+                repo: repo,
                 title: issueTitle,
                 body: issueBody,
                 labels: ['incomplete issue'],
@@ -152,35 +199,53 @@ jobs:
               }));
             } catch (error) {
               console.error('Error creating issue:', error);
-              core.setFailed(`Failed to create issue: ${error.message}`); // Make the step fail
+              core.setFailed(`Failed to create issue: ${error.message}`);
             }
 
       - name: Comment on PR review with issue link
-        if: fromJSON(steps.create-issue.outputs.result).success && steps.create-issue.outcome == 'success'
+        if: steps.create-issue.outcome == 'success'
         uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_AUTHOR_LOGIN: ${{ inputs.pr_author_login }}
+          COMMENT_ID: ${{ inputs.comment_id }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const result = ${{ steps.create-issue.outputs.result }};
+            const core = require('@actions/core');
+            const github = require('@actions/github');
+            const resultJson = '${{ steps.create-issue.outputs.result }}'; // Get output as string
 
-            if (!result.issue_number || !result.issue_url) {
-              core.setFailed('Missing issue information in result, cannot comment on PR.');
+            if (!resultJson) {
+              core.warning('Result from create-issue step is empty. Cannot comment on PR.');
               return;
             }
 
+            const result = JSON.parse(resultJson);
+
+            if (!result.success || !result.issue_number || !result.issue_url) {
+              // If success was false, the 'if' condition of the step should have prevented this.
+              // This is a fallback or if the 'if' condition is made less strict.
+              core.warning('Missing issue information or success:false in result, cannot comment on PR.');
+              return;
+            }
+
+            const prNumber = parseInt(process.env.PR_NUMBER);
+            const prAuthorLogin = process.env.PR_AUTHOR_LOGIN;
+            const commentIdToReply = parseInt(process.env.COMMENT_ID);
+            const owner = github.context.repo.owner;
+            const repo = github.context.repo.repo;
+
             try {
               await github.rest.pulls.createReviewComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.payload.pull_request.number,
-                body: `✅ I've created issue #${result.issue_number} to track this item and assigned it to @${context.payload.pull_request.user.login}. [View the issue](${result.issue_url})`,
-                in_reply_to: context.payload.comment.id // Reply to the original comment
+                owner: owner,
+                repo: repo,
+                pull_number: prNumber,
+                body: `✅ I've created issue #${result.issue_number} to track this item and assigned it to @${prAuthorLogin}. [View the issue](${result.issue_url})`,
+                in_reply_to: commentIdToReply
               });
-              console.log(`Successfully replied to comment ${context.payload.comment.id} in PR #${context.payload.pull_request.number}`);
+              console.log(`Successfully replied to comment ${commentIdToReply} in PR #${prNumber}`);
             } catch (error) {
               console.error('Error replying to PR review comment:', error);
-              // If replying fails, we might not want the whole workflow to fail,
-              // as the issue was still created. Log it, but don't necessarily `throw error;`
-              // unless you consider this a critical failure.
               core.warning(`Failed to reply to PR comment, but issue #${result.issue_number} was created: ${error.message}`);
             }
