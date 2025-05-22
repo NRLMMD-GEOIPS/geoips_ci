@@ -89,8 +89,8 @@ jobs:
             const commentInReplyToId = process.env.COMMENT_IN_REPLY_TO_ID ? parseInt(process.env.COMMENT_IN_REPLY_TO_ID) : null;
 
             // Repo context is available directly
-            const owner = github.context.repo.owner;
-            const repo = github.context.repo.repo;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
 
             if (!prNumber || !commentId) {
               core.setFailed('Missing required input data (pr_number or comment_id).');
@@ -226,8 +226,8 @@ jobs:
             const prNumber = parseInt(process.env.PR_NUMBER);
             const prAuthorLogin = process.env.PR_AUTHOR_LOGIN;
             const commentIdToReply = parseInt(process.env.COMMENT_ID);
-            const owner = github.context.repo.owner;
-            const repo = github.context.repo.repo;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
 
             try {
               await github.rest.pulls.createReviewComment({
