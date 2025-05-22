@@ -47,9 +47,6 @@ on:
         description: 'The ID of the comment this comment is replying to (if any)'
         required: false
         type: string
-    secrets:
-      GITHUB_TOKEN:
-        required: true
 
 permissions:
   pull-requests: write
