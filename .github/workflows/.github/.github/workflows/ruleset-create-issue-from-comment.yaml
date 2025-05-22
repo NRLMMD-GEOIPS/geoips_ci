@@ -7,11 +7,23 @@ on:
 jobs:
   trigger-issue-creation:
     name: Check Comment and Trigger Issue Creation
-    if: contains(toLower(github.event.comment.body), 'please open an issue')
+    if: contains(github.event.comment.body, 'please open an issue')
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-create-issue-from-comment.yaml@Comment-to-issue-automagical
     permissions:
-      contents: read 
-      pull-requests: write # Needed because the reusable workflow will comment back on the PR
-      issues: write      # Needed because the reusable workflow will create an issue
+      contents: read
+      pull-requests: write
+      issues: write
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+      pr_title: ${{ github.event.pull_request.title }}
+      pr_author_login: ${{ github.event.pull_request.user.login }}
+      pr_html_url: ${{ github.event.pull_request.html_url }}
+      comment_id: ${{ github.event.comment.id }}
+      comment_body: ${{ github.event.comment.body }}
+      comment_html_url: ${{ github.event.comment.html_url }}
+      comment_path: ${{ github.event.comment.path }}
+      comment_line: ${{ github.event.comment.line || github.event.comment.original_line || 'Unknown' }}
+      comment_user_login: ${{ github.event.comment.user.login }}
+      comment_in_reply_to_id: ${{ github.event.comment.in_reply_to_id }}
     secrets:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
