@@ -47,6 +47,9 @@ on:
         description: 'The ID of the comment this comment is replying to (if any)'
         required: false
         type: string
+    secrets:
+      GITHUB_TOKEN:
+        required: true
 
 permissions:
   pull-requests: write
@@ -74,6 +77,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const core = require('@actions/core');
+            const github = require('@actions/github');
 
             // Access data from environment variables (populated from inputs)
             const prNumber = parseInt(process.env.PR_NUMBER);
@@ -89,8 +94,8 @@ jobs:
             const commentInReplyToId = process.env.COMMENT_IN_REPLY_TO_ID ? parseInt(process.env.COMMENT_IN_REPLY_TO_ID) : null;
 
             // Repo context is available directly
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
+            const owner = github.context.repo.owner;
+            const repo = github.context.repo.repo;
 
             if (!prNumber || !commentId) {
               core.setFailed('Missing required input data (pr_number or comment_id).');
@@ -154,7 +159,7 @@ jobs:
                 }
               }
             } catch (error) {
-              console.log('Error fetching/processing comment thread:', error);
+              core.error('Error fetching/processing comment thread: ' + error.message);
               commentThread = '### Triggering Comment\n\n';
               commentThread += `**@${commentUser}** [commented](${commentUrl}) on \`${commentPath}\`:\n`;
               commentThread += `> ${commentBody.replace(/\n/g, '\n> ')}\n\n`;
@@ -186,15 +191,38 @@ jobs:
                 assignees: [prAuthor]
               });
 
-              console.log(`Created issue #${issue.data.number}`);
-              core.setOutput('result', JSON.stringify({
+              console.log(`Created issue #${issue.data.number}. Full issue data: ${JSON.stringify(issue.data, null, 2)}`);
+
+              const issueNumber = issue.data.number;
+              const issueUrl = issue.data.html_url;
+
+              core.info(`Extracted issue_number: ${issueNumber} (type: ${typeof issueNumber})`);
+              core.info(`Extracted issue_url: ${issueUrl} (type: ${typeof issueUrl})`);
+
+              const outputPayload = {
                 success: true,
-                issue_number: issue.data.number,
-                issue_url: issue.data.html_url
-              }));
+                issue_number: issueNumber,
+                issue_url: issueUrl
+              };
+              const jsonStringToSet = JSON.stringify(outputPayload);
+
+              core.info(`GITHUB_OUTPUT env var: ${process.env.GITHUB_OUTPUT}`); // Check if GITHUB_OUTPUT is set
+              core.info(`JSON string to be set as output 'result': "${jsonStringToSet}"`); // Log with quotes to see if it's truly empty
+
+              if (jsonStringToSet === undefined || jsonStringToSet === null || typeof jsonStringToSet !== 'string' || jsonStringToSet.trim() === '') {
+                core.warning(`The JSON string for output is empty, null, undefined, or not a string before calling setOutput! Value: "${jsonStringToSet}", Type: ${typeof jsonStringToSet}`);
+              }
+
+              core.setOutput('result', jsonStringToSet);
+              core.info("core.setOutput('result', ...) was called."); // Confirmation
+
+              // As a fallback/test, set a simple string output too
+              core.setOutput('test_output', "This is a test string output");
+              core.info("core.setOutput('test_output', ...) was called.");
+
             } catch (error) {
-              console.error('Error creating issue:', error);
-              core.setFailed(`Failed to create issue: ${error.message}`);
+              console.error('Error creating issue or setting output:', error);
+              core.setFailed(`Failed to create issue or set output: ${error.message}`);
             }
 
       - name: Comment on PR review with issue link
@@ -207,10 +235,22 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const resultJson = '${{ steps.create-issue.outputs.result }}'; // Get output as string
+            const core = require('@actions/core');
+            const github = require('@actions/github');
+            const resultJson = '${{ steps.create-issue.outputs.result }}';
+            const testOutputFromPreviousStep = '${{ steps.create-issue.outputs.test_output }}';
+
+            core.info(`Received resultJson: "${resultJson}"`); // Log with quotes
+            core.info(`Received test_output: "${testOutputFromPreviousStep}"`); // Log with quotes
 
             if (!resultJson) {
               core.warning('Result from create-issue step is empty. Cannot comment on PR.');
+              // Optionally, you can add more checks here based on test_output
+              if (testOutputFromPreviousStep === "This is a test string output") {
+                core.warning('However, the test_output was received correctly. Problem might be with the main "result" output content or its stringification.');
+              } else {
+                core.warning('The test_output was ALSO not received or empty. This suggests a more fundamental problem with outputs.');
+              }
               return;
             }
 
@@ -226,8 +266,8 @@ jobs:
             const prNumber = parseInt(process.env.PR_NUMBER);
             const prAuthorLogin = process.env.PR_AUTHOR_LOGIN;
             const commentIdToReply = parseInt(process.env.COMMENT_ID);
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
+            const owner = github.context.repo.owner;
+            const repo = github.context.repo.repo;
 
             try {
               await github.rest.pulls.createReviewComment({
