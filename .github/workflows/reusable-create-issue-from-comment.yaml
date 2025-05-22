@@ -75,17 +75,25 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             // Access data from environment variables (populated from inputs)
-            const prNumber = parseInt(process.env.PR_NUMBER);
-            const prTitle = process.env.PR_TITLE;
-            const prAuthor = process.env.PR_AUTHOR_LOGIN;
-            const prHtmlUrl = process.env.PR_HTML_URL;
-            const commentId = parseInt(process.env.COMMENT_ID);
-            const commentBody = process.env.COMMENT_BODY;
-            const commentUrl = process.env.COMMENT_HTML_URL;
-            const commentPath = process.env.COMMENT_PATH;
-            const commentLine = process.env.COMMENT_LINE;
-            const commentUser = process.env.COMMENT_USER_LOGIN;
-            const commentInReplyToId = process.env.COMMENT_IN_REPLY_TO_ID ? parseInt(process.env.COMMENT_IN_REPLY_TO_ID) : null;
+            // Using process.env directly to avoid code injection
+            const { 
+              PR_NUMBER, 
+              PR_TITLE, 
+              PR_AUTHOR_LOGIN, 
+              PR_HTML_URL, 
+              COMMENT_ID, 
+              COMMENT_BODY, 
+              COMMENT_HTML_URL, 
+              COMMENT_PATH, 
+              COMMENT_LINE, 
+              COMMENT_USER_LOGIN, 
+              COMMENT_IN_REPLY_TO_ID 
+            } = process.env;
+            
+            const prNumber = parseInt(PR_NUMBER);
+            const commentId = parseInt(COMMENT_ID);
+            const commentInReplyToId = COMMENT_IN_REPLY_TO_ID ? parseInt(COMMENT_IN_REPLY_TO_ID) : null;
+            const commentLine = COMMENT_LINE;
 
             // Repo context is available directly
             const owner = context.repo.owner;
@@ -96,7 +104,7 @@ jobs:
               return { success: false, error: 'Missing required input data (pr_number or comment_id).' };
             }
 
-            const issueTitle = `[PR #${prNumber}] ${prTitle} - Incomplete Item from comment`;
+            const issueTitle = `[PR #${prNumber}] ${PR_TITLE} - Incomplete Item from comment`;
 
             let commentThread = '';
             try {
@@ -112,8 +120,8 @@ jobs:
               if (!currentCommentObject) {
                 core.warning(`Triggering comment with ID ${commentId} not found in PR comments. Issue will be created with minimal comment data.`);
                 commentThread = '### Triggering Comment\n\n';
-                commentThread += `**@${commentUser}** [commented](${commentUrl}) on \`${commentPath}\`:\n`;
-                commentThread += `> ${commentBody.replace(/\n/g, '\n> ')}\n\n`;
+                commentThread += `**@${COMMENT_USER_LOGIN}** [commented](${COMMENT_HTML_URL}) on \`${COMMENT_PATH}\`:\n`;
+                commentThread += `> ${COMMENT_BODY.replace(/\n/g, '\n> ')}\n\n`;
               } else {
                 let relatedComments = [];
 
@@ -155,24 +163,24 @@ jobs:
             } catch (error) {
               core.error('Error fetching/processing comment thread: ' + error.message);
               commentThread = '### Triggering Comment\n\n';
-              commentThread += `**@${commentUser}** [commented](${commentUrl}) on \`${commentPath}\`:\n`;
-              commentThread += `> ${commentBody.replace(/\n/g, '\n> ')}\n\n`;
+              commentThread += `**@${COMMENT_USER_LOGIN}** [commented](${COMMENT_HTML_URL}) on \`${COMMENT_PATH}\`:\n`;
+              commentThread += `> ${COMMENT_BODY.replace(/\n/g, '\n> ')}\n\n`;
             }
 
             const issueBody = `
             ## Issue created from PR review comment
 
-            This issue was automatically created from a review comment in [PR #${prNumber}](${prHtmlUrl}).
+            This issue was automatically created from a review comment in [PR #${prNumber}](${PR_HTML_URL}).
 
             ### Details
-            - **File**: \`${commentPath}\`
+            - **File**: \`${COMMENT_PATH}\`
             - **Line**: ${commentLine}
-            - **PR Author**: @${prAuthor}
-            - **Comment Author**: @${commentUser}
+            - **PR Author**: @${PR_AUTHOR_LOGIN}
+            - **Comment Author**: @${COMMENT_USER_LOGIN}
 
             ${commentThread}
 
-            [View the original comment](${commentUrl})
+            [View the original comment](${COMMENT_HTML_URL})
             `;
 
             try {
@@ -182,10 +190,10 @@ jobs:
                 title: issueTitle,
                 body: issueBody,
                 labels: ['incomplete issue'],
-                assignees: [prAuthor]
+                assignees: [PR_AUTHOR_LOGIN]
               });
 
-              console.log(`Created issue #${issue.data.number}. Full issue data: ${JSON.stringify(issue.data, null, 2)}`);
+              console.log(`Created issue #${issue.data.number}.`);
 
               const issueNumber = issue.data.number;
               const issueUrl = issue.data.html_url;
@@ -222,6 +230,11 @@ jobs:
           script: |
             const resultJson = '${{ steps.create-issue.outputs.result }}';
             const testOutputFromPreviousStep = '${{ steps.create-issue.outputs.test_output }}';
+            
+            // Access environment variables directly using process.env
+            const { PR_NUMBER, PR_AUTHOR_LOGIN, COMMENT_ID } = process.env;
+            const prNumber = parseInt(PR_NUMBER);
+            const commentIdToReply = parseInt(COMMENT_ID);
 
             core.info(`Received resultJson: "${resultJson}"`);
             core.info(`Received test_output: "${testOutputFromPreviousStep}"`);
@@ -243,9 +256,6 @@ jobs:
               return;
             }
 
-            const prNumber = parseInt(process.env.PR_NUMBER);
-            const prAuthorLogin = process.env.PR_AUTHOR_LOGIN;
-            const commentIdToReply = parseInt(process.env.COMMENT_ID);
             const owner = context.repo.owner;
             const repo = context.repo.repo;
 
@@ -254,7 +264,7 @@ jobs:
                 owner: owner,
                 repo: repo,
                 pull_number: prNumber,
-                body: `✅ I've created issue #${result.issue_number} to track this item and assigned it to @${prAuthorLogin}. [View the issue](${result.issue_url})`,
+                body: `✅ I've created issue #${result.issue_number} to track this item and assigned it to @${PR_AUTHOR_LOGIN}. [View the issue](${result.issue_url})`,
                 in_reply_to: commentIdToReply
               });
               console.log(`Successfully replied to comment ${commentIdToReply} in PR #${prNumber}`);
