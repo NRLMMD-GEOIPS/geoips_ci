@@ -199,7 +199,7 @@
         "stderr", "stdout", "stdin", "mydatatype", "ndarray", "dtype", "mymathlib", "imshow",
         "cmap", "fname", "idontexist", "itype", "idict", "iregistry", "pname", "fpaths",
         "cogeotiff", "fnames", "logfname", "mycm", "rplugin", "oscat", "hscat", "imerg",
-        "yyyyjjjhhmn"
+        "yyyyjjjhhmn", "NRLMMD",
     ],
 
     // --- Global Ignore Patterns ---
