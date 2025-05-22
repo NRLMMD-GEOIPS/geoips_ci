@@ -18,6 +18,8 @@ on:
 #   pull_request:
 #   # Allows run of this workflow manually from the Actions tab
 #   workflow_dispatch:
+env:
+  RUNNER: ${{ vars.RUNNER || ‘ubuntu-latest’ }} # Default value fallback
 
 defaults:
   run:
@@ -38,7 +40,7 @@ jobs:
 
   # Set variables that should be accessible to all jobs
   get-job-flags:
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ env.RUNNER }}
     outputs:
       CHECK_NEW_RELEASE_NOTE: ${{ steps.get_job_flags.outputs.CHECK_NEW_RELEASE_NOTE }}
     steps:
@@ -86,7 +88,7 @@ jobs:
       needs.get-job-flags.outputs.CHECK_NEW_RELEASE_NOTE == 'true'
     needs: [check-release-branch, get-job-flags, get-versions]
     # This can run on the "standard" runner, no specific settings required.
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ env.RUNNER }}
     steps:
       - name: Configure Git safe directory
         run: git config --global --add safe.directory $PWD
