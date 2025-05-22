@@ -13,7 +13,7 @@ name: Deploy docs
 #    * deploy docs with geoips/docs/deploy_pages.sh
 
 env:
-  RUNNER_OS: ${{ vars.RUNNER || ‘ubuntu-latest’ }} # Default value fallback
+  RUNNER: ${{ vars.RUNNER || ‘ubuntu-latest’ }} # Default value fallback
 
 on:
   workflow_call:
@@ -27,7 +27,7 @@ jobs:
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
 
   deploy_ghpages:
-    runs-on: ${{ env.RUNNER_OS }}
+    runs-on: ${{ env.RUNNER }}
     name: "Build and deploy docs to GitHub Pages"
     permissions:
       contents: write
