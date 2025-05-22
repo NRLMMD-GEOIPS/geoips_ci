@@ -12,9 +12,7 @@ permissions:
 jobs:
   create-issue-from-comment:
     runs-on: ubuntu-latest
-    # This 'if' condition is crucial: it ensures the job only runs
-    # when the comment contains the trigger phrase.
-    if: contains(github.event.comment.body, 'please open an issue')
+    if: contains(toLower(github.event.comment.body), 'please open an issue')
     steps:
       - name: Create issue with comment thread
         id: create-issue
