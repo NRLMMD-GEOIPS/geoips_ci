@@ -7,9 +7,6 @@ on:
       token:
         required: true
 
-env:
-  RUNNER: ${{ vars.RUNNER || 'ubuntu-latest' }} # Default value fallback
-  
 # Assuming the below is in the workflow for an individual repository.
 # # Note we want to run linting all the time - on pull request pushes,
 # # when pull requests are merged to default, on release. At all points,
@@ -34,7 +31,7 @@ defaults:
 jobs:
   # Set variables that should be accessible to all jobs
   get-job-flags:
-    runs-on: ${{ env.RUNNER }}
+    runs-on: ${{ vars.RUNNER }}
     env:
       CURR_REPO: ${{ github.event.repository.name }}
     outputs:
@@ -86,7 +83,7 @@ jobs:
       CI_LINT_BLACK: ${{ needs.get-job-flags.outputs.CI_LINT_BLACK }}
 
   run_linters:
-    runs-on: ${{ env.RUNNER }}
+    runs-on: ${{ vars.RUNNER }}
     needs: [get-job-flags]
     steps:
       - name: Setup Python

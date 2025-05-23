@@ -1,8 +1,5 @@
 name: Check release branch
 
-env:
-  RUNNER: ${{ vars.RUNNER || 'ubuntu-latest' }} # Default value fallback
-  
 on:
   workflow_call:
     outputs:
@@ -12,7 +9,7 @@ on:
 
 jobs:
   check-release-branch:
-    runs-on: ${{ env.RUNNER }}
+    runs-on: ${{ vars.RUNNER }}
     name: Check release branch
     outputs:
       # Note pull request merged does not propagate to reusable workflows
