@@ -1,8 +1,5 @@
 name: Print variables
 
-env:
-  RUNNER: ${{ vars.RUNNER || 'ubuntu-latest' }} # Default value fallback
-
 on:
   workflow_call:
     inputs:
@@ -57,7 +54,7 @@ on:
 
 jobs:
   print-variables:
-    runs-on: ${{ env.RUNNER }}
+    runs-on: ${{ vars.RUNNER }}
     name: Print variables
     steps:
       - name: Print run flags
