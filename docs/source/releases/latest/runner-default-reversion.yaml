@@ -1,0 +1,16 @@
+continuous integration:
+- title: 'Revert changes from runner default setting'
+  description: 'Fix failing tests from recent changes that attempted to allow default runner setting. This reverts to a previous commit state for the workflow files.'
+  files:
+    modified:
+    - '.github/workflows/reusable-check-release-branch.yaml'
+    - '.github/workflows/reusable-deploy-docs.yaml'
+    - '.github/workflows/reusable-lint.yaml'
+    - '.github/workflows/reusable-print-variables.yaml'
+    - '.github/workflows/reusable-proper-release-note-edits.yaml'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: null
+    finish: null
