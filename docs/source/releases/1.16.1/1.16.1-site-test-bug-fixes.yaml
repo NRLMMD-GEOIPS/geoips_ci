@@ -1,0 +1,15 @@
+release updates:
+- title: 'Bug fixes on the open source github.com GeoIPS Site integration tests.'
+  description: |
+    Bug fixes required to get the GeoIPS Site integration tests to pass on all available
+    github.com open source repositories.
+
+    Also update standard sync files
+  files:
+    modified:
+    - 'docs/source/releases/'
+  date:
+    start: 2025-06-09
+    finish: 2025-06-09
+  related-issue:
+      internal: GEOIPS#861

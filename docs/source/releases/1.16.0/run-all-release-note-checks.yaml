@@ -1,0 +1,22 @@
+bug fix:
+- title: 'Run all check release note steps if not cancelled'
+  description: |
+    Ensure if one of the release note checks fails, the others are still run for reference.
+    
+    We want to be able to see that all other steps pass if one expected step fails
+    (e.g., expected modified RST files during release PR, but we still want to ensure
+    the YAML release notes were modified in the correct place)
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - '.github/workflows/reusable-proper-release-note-edits.yaml'
+  related-issue:
+    internal: GEOIPS#861
+  date:
+    start: 2025-06-03
+    finish: 2025-06-03

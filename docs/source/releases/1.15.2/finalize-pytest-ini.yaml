@@ -1,0 +1,25 @@
+documentation:
+- title: 'Add explanations to the various pytest markers'
+  description: |
+    Provide informative descriptions of the pytest markers.
+
+    * base+full+extra cover everything in current repo
+    * system covers any tests that touch other repos
+    * realtime covers complete system installation tests
+    * preprocess covers external preprocessing capabilities
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - 'sync/pytest.ini'
+    - 'pytest.ini'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: 2025-04-23
+    finish: 2025-05-08

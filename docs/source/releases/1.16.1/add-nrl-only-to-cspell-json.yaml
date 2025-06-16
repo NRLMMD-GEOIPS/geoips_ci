@@ -1,0 +1,20 @@
+bug fix:
+- title: 'Add NRL ONLY section to cspell.json'
+  description: |
+    Add a section to use internal only, and remove upon
+    pushing back out to github.com
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - .cspell.json
+    - sync/.cspell.json
+  related-issue:
+    internal: GEOIPS#863
+  date:
+    start: 2025-06-03
+    finish: 2025-06-03

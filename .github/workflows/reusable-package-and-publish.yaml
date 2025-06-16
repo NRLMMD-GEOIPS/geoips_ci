@@ -56,8 +56,8 @@ jobs:
           python -m pip install -U build pip
           python -m build
       - name: Publish package to PyPI
-          # upload to PyPI on every release for a tag starting with 'v'
-          # if: github.event.action == 'published' && startsWith(github.event.release.tag_name, 'v')
+        # upload to PyPI on every release for a tag starting with 'v'
+        # if: github.event.action == 'published' && startsWith(github.event.release.tag_name, 'v')
         uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc # v1.12.4
         with:
           user: ${{ secrets.pypi_user }}

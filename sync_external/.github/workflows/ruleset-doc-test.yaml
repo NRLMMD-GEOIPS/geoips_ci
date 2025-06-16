@@ -33,7 +33,12 @@ jobs:
     name: Doctest
     # You do not appear to be able to use variables in the "uses" field.
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-doc-test.yaml@main
-    if: "!contains(github.event.repository.name, 'test_data_')"
+    # Do not run doc-test on geoips_ci, .github, or test_data repos.  These repos
+    # are not pip installable, so do not attempt to run.
+    if: >
+      !contains(github.event.repository.name, 'test_data') &&
+      !github.event.repository.name == 'geoips_ci' &&
+      !github.event.repository.name == '.github'
     permissions:
       contents: write
       packages: write

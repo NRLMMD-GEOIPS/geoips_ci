@@ -1,5 +1,5 @@
 documentation:
-- title: Add release note for version 1.14.5
+- title: Add release note for version 1.15.3
   description: |
     Release note on release branch to force tag/release, package/publish,
     and deploy docs.
@@ -7,11 +7,11 @@ documentation:
     Additionally add any updated files from geoips_ci/sync
   files:
     added:
-    - docs/source/releases/latest/1.14.5-release-note.yaml
+    - docs/source/releases/latest/1.15.3-release-note.yaml
     modified:
     - geoips_ci/sync updated files
   date:
-    start: 2025-03-11
-    finish: 2025-03-11
+    start: 2025-05-23
+    finish: 2025-05-23
   related-issue:
-    internal: GEOIPS#753 - 1.14.5 updates
+    internal: GEOIPS#861 - 1.15.3 updates
