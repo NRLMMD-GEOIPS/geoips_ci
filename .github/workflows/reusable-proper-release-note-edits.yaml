@@ -134,6 +134,7 @@ jobs:
         # release branch, because it is an automated finalization of the
         # release notes, so there is no requirement to manually update.
         if: >
+          ! cancelled() &&
           github.ref_name != github.event.repository.default_branch &&
           needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH != 'true'
         run: |
@@ -172,27 +173,42 @@ jobs:
           fi
       - name: Check version release YAML release note files
         if: >
+          ! cancelled() &&
           needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH == 'true'
         run: |
           vers=${{ needs.get-versions.outputs.TAGGED_VERSION }}
           reldir=./current_repo_current_branch/docs/source/releases/$vers
+          if [[ -d $reldir ]]; then
+              echo "rmdir --ignore-fail-on-non-empty $reldir"
+              rmdir --ignore-fail-on-non-empty $reldir
+          fi
           latestdir=./current_repo_current_branch/docs/source/releases/latest
+          if [[ -d $latestdir ]]; then
+              echo "rmdir --ignore-fail-on-non-empty $latestdir"
+              rmdir --ignore-fail-on-non-empty $latestdir
+          fi
           reponame=${{ github.event.repository.name }}
           if [[ "$reponame" != "template_"* && ! -d $reldir ]]; then
             echo "FAILED: Non-template repo does not have the $vers directory, and is a release branch"
             echo "Please move latest directory to $vers"
+            ls -l ./current_repo_current_branch/docs/source/releases
             exit 1
           elif [[ "$reponame" != "template_"* && -d $latestdir ]]; then
             echo "FAILED: latest directory still exists in non-template repo, and is a release branch"
             echo "Please move latest directory to $vers"
+            ls -l ./current_repo_current_branch/docs/source/releases
+            ls -l $latestdir
             exit 1
           elif [[ "$reponame" == "template_"* && -d $reldir ]]; then
             echo "FAILED: Template repo DOES have the $vers directory"
             echo "Template repos should always retain the 'latest' folder, please move '$vers' back to 'latest'"
+            ls -l ./current_repo_current_branch/docs/source/releases
+            ls -l $reldir
             exit 1
           elif [[ "$reponame" == "template_"* && ! -d $latestdir ]]; then
             echo "FAILED: latest directory DOES NOT exist in template repo, and is a release branch"
             echo "Template repos should always retain the 'latest' folder, please move '$vers' back to 'latest'"
+            ls -l ./current_repo_current_branch/docs/source/releases
             exit 1
           else
             echo "PASSED"

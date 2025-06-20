@@ -1,0 +1,23 @@
+actions:
+- title: 'Skip all repos named *test_data* in doc-test workflows'
+  description: |
+    To allow skipping both test_data_* and template_test_data repos, skip all repos named with *test_data* in the doc-test workflow.
+
+    This includes both the .github/workflows/ruleset-doc-test.yaml, as well as the sync_external ruleset (since external repositories must
+    directly include the workflow, since repos in external organizations cannot be included in our org rulesets.)
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - 'sync_external/.github/workflows/ruleset-doc-test.yaml'
+    - '.github/workflows/ruleset-doc-test.yaml'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: 2025-05-14
+    finish: 2025-05-14

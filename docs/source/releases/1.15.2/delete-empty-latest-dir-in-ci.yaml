@@ -1,0 +1,19 @@
+documentation:
+- title: 'Delete the empty latest release folder in the CI'
+  description: |
+    To ensure we have a clean release folder, delete empty latest folder if it exists.
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - '.github/workflows/reusable-proper-release-note-edits.yaml'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: 2025-05-12
+    finish: 2025-05-12

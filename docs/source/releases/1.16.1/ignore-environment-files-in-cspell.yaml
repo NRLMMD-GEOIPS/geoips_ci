@@ -1,0 +1,19 @@
+bug fix:
+- title: 'Ignore environment files (pip and mamba) for cspell'
+  description: |
+    Do not spell check pip requirements.txt or mamba/conda env YAMLs.
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - .cspell.json
+    - sync/.cspell.json
+  related-issue:
+    internal: GEOIPS#863
+  date:
+    start: 2025-06-09
+    finish: 2025-06-09

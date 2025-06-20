@@ -1,0 +1,24 @@
+testing:
+- title: 'Finalize pytest integration markers based on SRS'
+  description: |
+    The Software Requirements Specification includes very specific delineation between GeoIPS Core, GeoIPS Site, and GeoIPS System
+    implementations.  Include markers for all levels based on the definitions in the SRS, and note that typical developers would
+    not require any of the 'system' level markers.
+
+    Update both the local pytest.ini in geoips_ci, as well as the sync/pytest.ini to ensure this makes it into all repos.
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - 'pytest.ini'
+    - 'sync/pytest.ini'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: 2025-05-14
+    finish: 2025-05-14

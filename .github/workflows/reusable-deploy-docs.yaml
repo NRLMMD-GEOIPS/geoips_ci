@@ -169,7 +169,7 @@ jobs:
           fi
 
           echo "Configuring Git for authentication..."
-          # Use the GITHUB_TOKEN for authentication
+          # Use the GITHUB_TOKEN for authentication on github.com
           # This replaces any https://github.com/ URL with an authenticated one
           GH_HOST=$(echo "$GITHUB_SERVER_URL" | sed 's#^https://##')
           git config --global url."https://x-access-token:$GITHUB_TOKEN@${GH_HOST}/".insteadOf "https://${GH_HOST}/"

@@ -1,0 +1,58 @@
+bug fix:
+- title: 'Add fortran .mod to gitignore'
+  description: 'Include fortran ignores to global file'
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - '.gitignore'
+    - 'sync/.gitignore'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: 2025-05-23
+    finish: 2025-05-23
+- title: 'Simplify pytest.ini importlib comment'
+  description: |
+    Just say importlib required for CLI, but breaks pytest-based integration
+    tests.
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - 'pytest.ini'
+    - 'sync/pytest.ini'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: 2025-05-23
+    finish: 2025-05-23
+- title: 'Remove incorrect comment from CODEOWNERS'
+  description: |
+    Unused comment.
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - '.github/CODEOWNERS'
+    - 'sync/.github/CODEOWNERS'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: 2025-05-23
+    finish: 2025-05-23
