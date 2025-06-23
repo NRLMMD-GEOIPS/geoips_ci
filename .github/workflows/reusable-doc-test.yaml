@@ -193,7 +193,7 @@ jobs:
         run: create_plugin_registries
       - name: Run code check script interfaces
         run: |
-          $BASE_GEOIPS_PATH/tests/utils/check_code.sh interfaces geoips
+          python $BASE_GEOIPS_PATH/tests/utils/test_interfaces
           ret=$?
           echo "::group::interface_analysis"
           echo "INTERFACES analysis of code"
