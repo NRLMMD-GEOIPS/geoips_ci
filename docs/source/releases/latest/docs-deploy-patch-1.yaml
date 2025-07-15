@@ -1,0 +1,12 @@
+continuous integration:
+- title: 'Fix broken Docs Deploy'
+  description: 'create_plugin_registries fails without some env vars set (what they are set to does not matter). This sets them.'
+  files:
+    modified:
+    - '.github/workflows/reusable-deploy-docs.yaml'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: July 15 2025
+    finish: July 25 2025
