@@ -101,6 +101,9 @@ jobs:
       - name: create_plugin_registries
         run: |
           echo "create plugin registries"
+          export GEOIPS_PACKAGES_DIR="."
+          export GEOIPS_OUTDIRS=""
+          export GEOIPS_TESTDATA_DIR=""
           which create_plugin_registries
           create_plugin_registries
           ret=$?
