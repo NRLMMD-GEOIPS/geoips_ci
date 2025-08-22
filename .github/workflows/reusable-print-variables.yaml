@@ -102,6 +102,9 @@ jobs:
           echo "Github context:"
           echo "$GITHUB_CONTEXT"
           echo ${{ github.context }}
+          echo ""
+          echo "Running as user:"
+          whoami
 
           # for var in $(echo '${{ toJson(needs.set-variables.outputs) }}' | jq -r 'keys[]'); do
           if [[ "${{ inputs.FLAGS }}" != "" ]]; then
@@ -117,3 +120,4 @@ jobs:
               target_ref=${{ github.event.repository.default_branch }}
           fi
           echo "remotes/origin/${target_ref}"
+
