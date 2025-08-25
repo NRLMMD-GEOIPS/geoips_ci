@@ -1,0 +1,12 @@
+continuous integration:
+- title: 'Add user log'
+  description: 'This adds a step to print the current user to help debug permission issues.'
+  files:
+    modified:
+    - '.github/workflows/reusable-print-variables.yaml'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: null
+    finish: null
