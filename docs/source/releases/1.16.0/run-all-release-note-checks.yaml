@@ -16,7 +16,7 @@ bug fix:
     modified:
     - '.github/workflows/reusable-proper-release-note-edits.yaml'
   related-issue:
-    internal: GEOIPS#861
+    internal: geoips#861
   date:
     start: 2025-06-03
     finish: 2025-06-03

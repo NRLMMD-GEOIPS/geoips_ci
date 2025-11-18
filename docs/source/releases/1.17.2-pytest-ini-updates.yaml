@@ -1,0 +1,22 @@
+testing:
+- title: 'Add */tests to pytest.ini paths, add system to concurrent markers'
+  description: |
+    * To allow running default paths from GEOIPS_PACKAGES_DIR, add */tests to pytest.ini
+      testpaths default (MUST call without a path to use the default!)
+    * Add system marker to the concurrent markers
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - 'pytest.ini'
+    - 'sync/pytest.ini'
+  related-issue:
+    internal: geoips#959 - 1.17.2 bug fixes
+  date:
+    start: 2025-10-30
+    finish: 2025-10-31
+
