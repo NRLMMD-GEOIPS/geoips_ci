@@ -41,3 +41,7 @@ A few notes on GitHub PR status checks:
    workflows to every repository within the organization, since they are called via
    the repository rulesets). External users can sync both the "sync" and "sync_external"
    directories in geoips_ci repo to have the complete GeoIPS setup.
+6. geoips_ci repo must be internal or public, not private, in order to use reusable workflows
+   or repository rulesets from internal repos.
+7. geoips_ci repo must have permissions granted on Settings -> Actions -> General -> Access
+   for other repos to use its rulesets and workflows

@@ -6,7 +6,7 @@ Release Process:
     added:
     - docs/source/releases/latest/1.14.3-internal-release.yaml
   related-issue:
-    internal: GEOIPS#715 - 1.14.3 updates
+    internal: geoips#715 - 1.14.3 updates
   date:
     start: 2024-11-23
     finish: 2024-11-23
