@@ -239,17 +239,18 @@ jobs:
           FULL_DOCLINTTEST_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${DOCLINTTEST_IMAGE}
           FULL_STABLEORLATEST_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${STABLEORLATEST_IMAGE}
 
-          echo "docker push $FULL_BUILDCACHE_IMAGE"
-          docker manifest inspect ${FULL_BUILDCACHE_IMAGE}
+          echo "NOT RUNNING docker manifest inspect $FULL_BUILDCACHE_IMAGE"
+          # docker manifest inspect ${FULL_BUILDCACHE_IMAGE}
 
-          # echo "docker push $FULL_DOCLINTTEST_IMAGE"
+          echo "NOT RUNNING docker manifest inspect $FULL_DOCLINTTEST_IMAGE"
           # docker manifest inspect ${FULL_DOCLINTTEST_IMAGE}
 
-          echo "docker push $FULL_STABLEORLATEST_IMAGE"
-          docker manifest inspect ${FULL_STABLEORLATEST_IMAGE}
+          echo "NOT RUNNING docker manifest inspect $FULL_STABLEORLATEST_IMAGE"
+          # docker manifest inspect ${FULL_STABLEORLATEST_IMAGE}
 
+          echo "RUNNING docker image ls"
           docker image ls
-          
+
       # If using docker buildx was requested via organization variable,
       # DO NOT run this section.
       - name: Push docker image with explicit docker push
@@ -260,17 +261,24 @@ jobs:
           FULL_DOCLINTTEST_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${DOCLINTTEST_IMAGE}
           FULL_STABLEORLATEST_IMAGE=${DOCKER_REGISTRY}/${REPO_NAME}/${STABLEORLATEST_IMAGE}
 
-          echo "docker push $FULL_BUILDCACHE_IMAGE"
-          docker manifest inspect ${FULL_BUILDCACHE_IMAGE}
+          echo "RUNNING docker push $FULL_BUILDCACHE_IMAGE"
           docker push $FULL_BUILDCACHE_IMAGE
 
           echo "docker push $FULL_DOCLINTTEST_IMAGE"
-          docker manifest inspect ${FULL_DOCLINTTEST_IMAGE}
           docker push $FULL_DOCLINTTEST_IMAGE
 
           echo "docker push $FULL_STABLEORLATEST_IMAGE"
-          docker manifest inspect ${FULL_STABLEORLATEST_IMAGE}
           docker push $FULL_STABLEORLATEST_IMAGE
+
+          echo "RUNNING docker manifest inspect ${FULL_DOCLINTTEST_IMAGE}"
+          docker manifest inspect ${FULL_DOCLINTTEST_IMAGE}
+
+          echo "RUNNING docker manifest inspect ${FULL_BUILDCACHE_IMAGE}"
+          docker manifest inspect ${FULL_BUILDCACHE_IMAGE}
+
+          echo "RUNNING docker manifest inspect ${FULL_STABLEORLATEST_IMAGE}"
+          docker manifest inspect ${FULL_STABLEORLATEST_IMAGE}
+
 
       - name: Build and push docker image with docker buildx action
         if: ${{ vars.USE_DOCKER_BUILDX_ACTION == 'true' }}

@@ -4,9 +4,6 @@ continuous integration:
   files:
     modified:
     - '.github/workflows/reusable-deploy-docs.yaml'
-  related-issue:
-    number: null
-    repo_url: ''
   date:
     start: July 15 2025
     finish: July 25 2025

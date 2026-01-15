@@ -1,0 +1,10 @@
+documentation:
+- title: 'Add some notes to README'
+  description: |
+    Debugging suggestions
+  files:
+    modified:
+    - 'README.md'
+  date:
+    start: 2025-09-24
+    finish: 2025-09-24

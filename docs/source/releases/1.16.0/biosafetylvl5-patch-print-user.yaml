@@ -4,9 +4,6 @@ continuous integration:
   files:
     modified:
     - '.github/workflows/reusable-print-variables.yaml'
-  related-issue:
-    number: null
-    repo_url: ''
   date:
     start: null
     finish: null
