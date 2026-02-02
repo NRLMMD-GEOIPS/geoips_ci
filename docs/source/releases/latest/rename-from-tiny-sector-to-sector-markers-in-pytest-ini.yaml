@@ -1,0 +1,21 @@
+testing:
+- title: 'Rename to sector markers from tiny sector, add not disabled and not limited_test_dataset_availability markers to default, other minor organization adjustments'
+  description: |
+    * Rename the tiny sector markers to sector, since these markers
+      could be used with any sector, not just tiny sectors.
+    * Add not disabled and not limited_test_dataset_availability to default markers (was just not optional)
+    * Other minor organizational adjustments to markers.
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - 'pytest.ini'
+    - 'sync/pytest.ini'
+  date:
+    start: 2026-02-02
+    finish: 2026-02-02
+
