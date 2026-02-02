@@ -1,0 +1,16 @@
+continuous integration:
+- title: 'Make spell-check non-blocking'
+  description: 'Added `continue-on-error: true` to the spell-check job so that it becomes non-blocking when the job fails.'
+  files:
+    deleted: []
+    moved: []
+    added: []
+    modified:
+    - 'sync_external/.github/workflows/ruleset-lint.yaml'
+    - '/docs/source/releases/latest/66-spell-check-job-in-linters-should-be-non-blocking.yaml'
+  related-issue:
+    number: 66
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026/02/02
+    finish: 2026/02/02
