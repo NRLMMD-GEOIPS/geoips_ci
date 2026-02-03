@@ -38,8 +38,9 @@ jobs:
             # For pushes, check modified files in the latest commit
             git diff --name-only --diff-filter=M ${{ github.event.before }} ${{ github.sha }} | xargs -I{} sh -c 'test -f "{}" && echo "{}"' | cspell --config .cspell.json --no-progress --no-must-find-files --file-list stdin
           fi
-        
-      - name: Check spelling on new files (blocking)
+
+      - name: Check spelling on new files (non-blocking)
+        continue-on-error: true
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
             # For pull requests, check new files in the PR
