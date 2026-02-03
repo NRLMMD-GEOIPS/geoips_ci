@@ -1,6 +1,6 @@
-bug fix:
-- title: 'Making the Spell Check Job Non-Blocking '
-  description: 'Making the Spell Check Job Non-Blocking.'
+ci:
+- title: 'Make the spell check CI non-blocking '
+  description: 'This allows PRs to be merged even if cspell fails. It still runs cspell for the convinience of reviewers.'
   files:
     deleted: []
     moved: []
