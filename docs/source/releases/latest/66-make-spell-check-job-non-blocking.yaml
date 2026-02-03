@@ -1,6 +1,6 @@
 ci:
 - title: 'Make the spell check CI non-blocking '
-  description: 'This allows PRs to be merged even if cspell fails. It still runs cspell for the convinience of reviewers.'
+  description: 'This allows PRs to be merged even if cspell fails. It still runs cspell for the convenience of reviewers.'
   files:
     deleted: []
     moved: []
