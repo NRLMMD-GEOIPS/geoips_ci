@@ -1,0 +1,17 @@
+bug fix:
+- title: 'Making the Spell Check Job Non-Blocking '
+  description: 'Making the Spell Check Job Non-Blocking.'
+  files:
+    deleted: []
+    moved: []
+    added:
+    - '/docs/source/releases/latest/66-make-spell-check-job-non-blocking.yaml'
+    modified:
+    - '/.github/workflows/reusable-cspell-spell-checking.yaml'
+    - '/sync_external/.github/workflows/ruleset-lint.yaml'
+  related-issue:
+    number: 66
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026/02/03
+    finish: 2026/02/03
