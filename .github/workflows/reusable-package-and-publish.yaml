@@ -6,11 +6,6 @@ name: Package/publish
 # 2. Package and Publish - on published release (from #1)
 #    * Build wheel
 #    * Publish to pypi
-# 3. Deploy docs - on published release (from #1)
-#    * pip install geoips
-#    * pip install plugin repo
-#    * build docs with geoips/docs/build_docs.sh
-#    * deploy docs with geoips/docs/deploy_pages.sh
 
 on:
   workflow_call:
