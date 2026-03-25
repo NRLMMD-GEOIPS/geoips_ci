@@ -1,0 +1,12 @@
+bug fix:
+- title: Update reusable-lint to setup python v6
+  description: |
+    * Update to latest.
+  files:
+    modified:
+    - .github/workflows/reusable-lint.yaml
+  related-issue:
+    internal: geoips#1029 - 1.18.0 updates*
+  date:
+    start: 2026-03-12
+    finish: 2026-03-12

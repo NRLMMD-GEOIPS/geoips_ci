@@ -1,7 +1,7 @@
 bug fix:
 - title: 'Update cspell.json'
   description: |
-    Keep synced with plugin repositories.
+    Keep synced with plugin repositories
   files:
     deleted:
     - ''
@@ -13,7 +13,7 @@ bug fix:
     - .cspell.json
     - sync/.cspell.json
   related-issue:
-    internal: GEOIPS#863
+    internal: geoips#863
   date:
     start: 2025-06-03
     finish: 2025-06-03

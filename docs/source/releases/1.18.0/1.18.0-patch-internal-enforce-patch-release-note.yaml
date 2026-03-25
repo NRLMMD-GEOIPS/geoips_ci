@@ -1,0 +1,13 @@
+bug fix:
+- title: Require patch release note on release branches
+  description: |
+    * To allow bug fixing release branches, require a patch releaes note on every
+      release branch (even if it is just to say "no patches")
+  files:
+    modified:
+    - .github/workflows/reusable-proper-release-note-edits.yaml
+  related-issue:
+    internal: geoips#1029 - 1.18.0 updates*
+  date:
+    start: 2026-03-12
+    finish: 2026-03-12

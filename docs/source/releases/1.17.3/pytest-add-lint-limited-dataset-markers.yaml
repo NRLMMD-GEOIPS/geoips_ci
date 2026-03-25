@@ -1,0 +1,18 @@
+testing:
+  - title: "Update to standard pytest based integration test setup"
+    description: |
+      * Update pytest.ini for new lint and limited dataset availability marker
+      * Separate base/lint/full tests in integration test script.
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - "pytest.ini"
+        - "tests/integration_tests/test_reponame.py"
+    date:
+      start: 2026-01-13
+      finish: 2026-01-23

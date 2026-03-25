@@ -36,9 +36,10 @@ jobs:
     # Do not run doc-test on geoips_ci, .github, or test_data repos.  These repos
     # are not pip installable, so do not attempt to run.
     if: >
-      !contains(github.event.repository.name, 'test_data') &&
-      !github.event.repository.name == 'geoips_ci' &&
-      !github.event.repository.name == '.github'
+      !contains(github.event.repository.name, 'test_data_') &&
+      github.event.repository.name != '.vscode' &&
+      github.event.repository.name != 'geoips_ci' &&
+      github.event.repository.name != '.github'
     permissions:
       contents: write
       packages: write

@@ -90,6 +90,11 @@ jobs:
     steps:
       - name: Configure Git safe directory
         run: git config --global --add safe.directory $PWD
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          check-latest: true
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -124,7 +129,7 @@ jobs:
               echo "DO NOT EDIT .RST FILES DIRECTLY :))"
               exit 1
           fi
-      - name: Detect new and modified YAML release note files
+      - name: NON RELEASE BRANCH Detect new and modified YAML release note files in latest directory
         # Don't try to check this if we are on default branch,
         # it is checking against default, so wouldn't show up as modified.
         # It would be on default branch if we were running this on push
@@ -171,7 +176,7 @@ jobs:
           else
               echo "PASSED"
           fi
-      - name: Check version release YAML release note files
+      - name: RELEASE BRANCH Check version release YAML release note files in version directory
         if: >
           ! cancelled() &&
           needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH == 'true'
@@ -213,11 +218,33 @@ jobs:
           else
             echo "PASSED"
           fi
+      - name: RELEASE BRANCH Check version release patch/bugfix YAML release note files in version directory
+        if: >
+          ! cancelled() &&
+          needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH == 'true'
+        run: |
+          vers=${{ needs.get-versions.outputs.TAGGED_VERSION }}
+          reldir=./current_repo_current_branch/docs/source/releases/$vers
+          bugfix_internal_relnote=$reldir/${vers}-patch-internal-*.yaml
+          bugfix_os_relnote=$reldir/${vers}-patch-os-*.yaml
+          nobugfix_relnote=$reldir/${vers}-no-bug-fixes-required-on-this-release.yaml
+          reponame=${{ github.event.repository.name }}
+          if [[ "$reponame" != "template_"* && "`ls $bugfix_os_relnote`" && "`ls $bugfix_internal_relnote`" == "" && "`ls $nobugfix_relnote`" == "" ]]; then
+            echo "FAILED: Non-template repo does not have the bug fix or no bug fix release note in the $vers directory, and is a release branch"
+            echo "Please add one of"
+            echo "    * $bugfix_internal_relnote"
+            echo "    * $bugfix_os_relnote"
+            echo "    * $nobugfix_relnote"
+            ls -l ./current_repo_current_branch/docs/source/releases/$vers
+            exit 1
+          else
+            echo "PASSED"
+          fi
       - name: Install brassy and pink
         if: >
           ! cancelled()
         run: pip install brassy; pip install pink
-      - name: Run brassy and pink on release branch
+      - name: RELEASE BRANCH Run brassy and pink on release branch
         if: >
           ! cancelled() &&
           needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH == 'true'
@@ -242,7 +269,7 @@ jobs:
             echo "::error::due to brassy violations, return code ${ret}"
             exit 1
           fi
-      - name: Run brassy and pink on non-release branch
+      - name: NON RELEASE BRANCH Run brassy and pink on non-release branch
         if: >
           ! cancelled() &&
           needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH != 'true'
