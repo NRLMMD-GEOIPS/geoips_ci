@@ -222,8 +222,10 @@ jobs:
         if: >
           ! cancelled() &&
           needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH == 'true'
+        env:
+          TAGGED_VERSION: ${{ needs.get-versions.outputs.TAGGED_VERSION }}
         run: |
-          vers=${{ needs.get-versions.outputs.TAGGED_VERSION }}
+          vers="${TAGGED_VERSION}"
           reldir=./current_repo_current_branch/docs/source/releases/$vers
           bugfix_internal_relnote=$reldir/${vers}-patch-internal-*.yaml
           bugfix_os_relnote=$reldir/${vers}-patch-os-*.yaml
