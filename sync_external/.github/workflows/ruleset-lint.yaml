@@ -23,5 +23,6 @@ jobs:
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-cspell-spell-checking.yaml@main
     permissions:
       contents: read
+      pull-requests: read
     secrets:
       token: ${{ secrets.GITHUB_TOKEN }}

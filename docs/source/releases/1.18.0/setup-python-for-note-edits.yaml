@@ -1,0 +1,10 @@
+bug fix:
+- title: Add setup-python to proper release note edits
+  description: |
+    Ensure python exists before trying to pip install brassy and pink
+  files:
+    modified:
+    - .github/workflows/reusable-proper-release-note-edits.yaml
+  date:
+    start: 2026-02-26
+    finish: 2026-02-26
