@@ -232,7 +232,7 @@ jobs:
           bugfix_os_relnote=$reldir/${vers}-patch-os-*.yaml
           nobugfix_relnote=$reldir/${vers}-no-bug-fixes-required-on-this-release.yaml
           reponame="$REPO_NAME"
-          if [[ "$reponame" != "template_"* && "`ls $bugfix_os_relnote`" && "`ls $bugfix_internal_relnote`" == "" && "`ls $nobugfix_relnote`" == "" ]]; then
+          if [[ "$reponame" != "template_"* && "`ls $bugfix_os_relnote`" == "" && "`ls $bugfix_internal_relnote`" == "" && "`ls $nobugfix_relnote`" == "" ]]; then
             echo "FAILED: Non-template repo does not have the bug fix or no bug fix release note in the $vers directory, and is a release branch"
             echo "Please add one of"
             echo "    * $bugfix_internal_relnote"
