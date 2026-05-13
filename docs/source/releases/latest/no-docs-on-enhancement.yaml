@@ -1,0 +1,13 @@
+ci:
+- title: 'Remove requirement for documentation of enhancements.'
+  description: 'This removes the requirement for documentation of enhancements.'
+  files:
+    deleted: []
+    moved: []
+    modified: ['.github/workflows/reusable-proper-rst-documentation-edits.yaml']
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: null
+    finish: null
