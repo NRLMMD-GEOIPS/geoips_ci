@@ -92,21 +92,16 @@ jobs:
             pytest-cache-${{ github.ref }}-
           save-always: true
 
-      - name: Set up Docker BuildKit cache
-        if: ${{ env.IS_PLUGIN != 'true' }}
-        run: mkdir -p /tmp/geoips-docker-cache
-
       - name: Build image (core)
         if: ${{ env.IS_PLUGIN != 'true' }}
         run: |
-          docker buildx build \
-            --cache-from type=local,src=/tmp/geoips-docker-cache \
-            --cache-to type=local,dest=/tmp/geoips-docker-cache,mode=max \
+          DOCKER_BUILDKIT=1 docker build \
+            --cache-from geoips:cache \
             --target ${{ vars.DOCKER_BUILD_TARGET || 'geoips-site' }} \
             --tag $IMAGE_TAG \
+            --tag geoips:cache \
             --build-arg EXTRA_PLUGINS="${{ vars.EXTRA_PLUGINS || '' }}" \
             --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
-            --load \
             --progress=plain \
             .
 
