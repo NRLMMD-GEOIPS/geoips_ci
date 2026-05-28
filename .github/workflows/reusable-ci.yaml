@@ -1,0 +1,347 @@
+name: Reusable CI (Docker-based)
+
+on:
+  workflow_call:
+    inputs:
+      geoips_image:
+        description: "Pre-built GeoIPS Docker image for plugin repos"
+        required: false
+        type: string
+        default: "ghcr.io/nrlmmd-geoips/geoips:latest"
+      run_core_tests:
+        description: "Also run core GeoIPS unit tests"
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      token:
+        required: false
+      docker_token:
+        required: false
+
+# ---------------------------------------------------------------------------
+# Example caller (in geoips or plugin repo):
+#
+#   name: CI
+#   on:
+#     pull_request:
+#     workflow_dispatch:
+#   concurrency:
+#     group: ci-${{ github.ref }}
+#     cancel-in-progress: true
+#   jobs:
+#     ci:
+#       uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-ci.yaml@main
+#       secrets:
+#         token: ${{ secrets.GITHUB_TOKEN }}
+#         docker_token: ${{ secrets.DOCKER_TOKEN }}
+#
+# Plugin repos can also pass:
+#       with:
+#         geoips_image: "ghcr.io/nrlmmd-geoips/geoips:latest"
+#         run_core_tests: true
+# ---------------------------------------------------------------------------
+
+# REQUIRED org variables:
+#   RUNNER — Docker-capable runner label (self-hosted recommended)
+#
+# OPTIONAL org variables:
+#   DOCKER_BUILD_TARGET — Dockerfile stage to build (default: geoips-site)
+#   TESTDATA_PATH       — host path for test data (default: ../.geoips-testdata)
+#   EXTRA_PLUGINS       — comma-separated extra plugin repos
+#   CI_LINT             — set to "false" to skip linting
+#   CI_INTEGRATION      — set to "false" to skip integration tests
+#   CI_DOCKER_USER      — container user for integration (default: root)
+#   ENABLE_DOCKER_REGISTRY — set to "true" to push image to registry
+#   DOCKER_REGISTRY     — registry URL for push
+#   DOCKER_REGISTRY_USER — registry username
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ci:
+    runs-on: ${{ vars.RUNNER }}
+    timeout-minutes: 120
+    env:
+      IMAGE_TAG: geoips:dev-${{ github.sha }}
+      CURR_REPO: ${{ github.event.repository.name }}
+      IS_PLUGIN: ${{ github.event.repository.name != 'geoips' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect package name
+        run: |
+          PACKAGE_NAME=$(grep -m1 '^name\s*=' pyproject.toml | sed 's/^name\s*=\s*["'"'"']\([^"'"'"']*\)["'"'"'].*/\1/')
+          if [ -z "$PACKAGE_NAME" ]; then
+            echo "::error::Could not detect package name from pyproject.toml"
+            exit 1
+          fi
+          echo "PACKAGE_NAME=${PACKAGE_NAME}" >> $GITHUB_ENV
+          echo "Detected package: ${PACKAGE_NAME}"
+
+      - name: Restore pytest cache
+        uses: actions/cache@v4
+        with:
+          path: .pytest_cache
+          key: pytest-cache-${{ github.ref }}-${{ github.sha }}
+          restore-keys: |
+            pytest-cache-${{ github.ref }}-
+          save-always: true
+
+      - name: Set up Docker BuildKit cache
+        if: ${{ env.IS_PLUGIN != 'true' }}
+        run: mkdir -p /tmp/geoips-docker-cache
+
+      - name: Build image (core)
+        if: ${{ env.IS_PLUGIN != 'true' }}
+        run: |
+          docker buildx build \
+            --cache-from type=local,src=/tmp/geoips-docker-cache \
+            --cache-to type=local,dest=/tmp/geoips-docker-cache,mode=max \
+            --target ${{ vars.DOCKER_BUILD_TARGET || 'geoips-site' }} \
+            --tag $IMAGE_TAG \
+            --build-arg EXTRA_PLUGINS="${{ vars.EXTRA_PLUGINS || '' }}" \
+            --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
+            --load \
+            --progress=plain \
+            .
+
+      - name: Pull base image (plugin repos)
+        if: ${{ env.IS_PLUGIN == 'true' }}
+        run: |
+          BASE_IMAGE="${{ inputs.geoips_image || 'ghcr.io/nrlmmd-geoips/geoips:latest' }}"
+          docker pull $BASE_IMAGE
+          docker tag $BASE_IMAGE $IMAGE_TAG
+
+      - name: Smoke test
+        run: |
+          docker run --rm $IMAGE_TAG python3 -c "import geoips; print(geoips.__version__)"
+
+      - name: Smoke test plugin
+        if: ${{ env.IS_PLUGIN == 'true' }}
+        run: |
+          docker run --rm --user root \
+            -v $(pwd):/workspace -w /workspace \
+            $IMAGE_TAG \
+            bash -c "pip install -e . && python3 -c 'import ${{ env.PACKAGE_NAME }}; print(\"OK\")'"
+
+      - name: Lint and unit tests
+        id: lint
+        run: |
+          if [ "${{ vars.CI_LINT }}" = "false" ]; then
+            echo "Lint disabled via CI_LINT=false"
+            LINT_CMD="echo Lint skipped"
+          else
+            LINT_CMD="/packages/geoips/tests/utils/check_code.sh all /workspace"
+          fi
+
+          if [ ! -d "tests/unit_tests" ]; then
+            UNIT_CMD="echo 'No unit tests found, skipping'"
+            UPLOAD_UNIT=false
+          else
+            UNIT_CMD="pytest -vv tests/unit_tests \
+              --html=/workspace/test-reports/unit-tests.html \
+              --self-contained-html \
+              --cov=${{ env.PACKAGE_NAME }} \
+              --cov-report=html:/workspace/test-reports/coverage-unit"
+            UPLOAD_UNIT=true
+          fi
+
+          docker run --rm \
+            --user root \
+            -v $(pwd):/workspace -w /workspace \
+            $IMAGE_TAG \
+            bash -c "
+              git config --global --add safe.directory /workspace
+              pip install -e '.[test,lint]' pytest-html
+              create_plugin_registries
+              ${LINT_CMD}
+              echo '---'
+              ${UNIT_CMD}
+            "
+
+          echo "UPLOAD_UNIT=${UPLOAD_UNIT:-false}" >> $GITHUB_ENV
+
+      - name: Core unit tests (plugin repos)
+        if: ${{ env.IS_PLUGIN == 'true' && inputs.run_core_tests }}
+        run: |
+          docker run --rm \
+            --user root \
+            -v $(pwd):/workspace -w /workspace \
+            $IMAGE_TAG \
+            bash -c "
+              git config --global --add safe.directory /workspace
+              pip install -e '.[test]' pytest-html
+              create_plugin_registries
+              pytest -vv /packages/geoips/tests/unit_tests \
+                --html=/workspace/test-reports/core-unit-tests.html \
+                --self-contained-html
+            "
+
+      - name: Upload core unit test report
+        if: ${{ env.IS_PLUGIN == 'true' && inputs.run_core_tests && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-unit-test-report
+          path: test-reports/core-unit-tests.html
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload unit test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: test-reports/unit-tests.html
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload unit test coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: test-reports/coverage-unit/
+          if-no-files-found: warn
+          retention-days: 14
+
+      # -------------------------------------------------------------------
+      # Test data + integration (skipped when CI_INTEGRATION == 'false')
+      # -------------------------------------------------------------------
+
+      - name: Set testdata path
+        if: ${{ vars.CI_INTEGRATION != 'false' }}
+        run: |
+          TESTDATA_PATH="${{ vars.TESTDATA_PATH }}"
+          if [ -z "${TESTDATA_PATH}" ]; then
+            TESTDATA_PATH="${{ github.workspace }}/../.geoips-testdata"
+          fi
+          echo "TESTDATA_PATH=${TESTDATA_PATH}" >> $GITHUB_ENV
+
+      - name: Ensure testdata directory exists on host
+        if: ${{ vars.CI_INTEGRATION != 'false' }}
+        run: |
+          mkdir -p ${TESTDATA_PATH} || sudo mkdir -p ${TESTDATA_PATH}
+          chmod a+w ${TESTDATA_PATH}
+
+      - name: Download test datasets via ansible
+        if: ${{ vars.CI_INTEGRATION != 'false' }}
+        run: |
+          BUILD_TARGET="${{ vars.DOCKER_BUILD_TARGET || 'geoips-site' }}"
+          case "$BUILD_TARGET" in
+            geoips-base) TAGS="base" ;;
+            geoips-full) TAGS="base,full" ;;
+            geoips-site) TAGS="base,full,site" ;;
+            *)           TAGS="base,full" ;;
+          esac
+
+          echo "Downloading test data for tags: ${TAGS}"
+          echo "Testdata path: ${TESTDATA_PATH}"
+
+          RUNNER_UID=$(id -u)
+          RUNNER_GID=$(id -g)
+
+          docker run --rm \
+            --user root \
+            -v ${TESTDATA_PATH}:/geoips_testdata \
+            -e GEOIPS_TESTDATA_DIR=/geoips_testdata \
+            $IMAGE_TAG \
+            bash -c "
+              cd /packages/geoips/tests/ansible
+              ansible-playbook playbooks/test_data.yml \
+                --tags ${TAGS} \
+                -e geoips_testdata_dir=/geoips_testdata \
+                -v
+              chown -R ${RUNNER_UID}:${RUNNER_GID} /geoips_testdata
+            "
+
+      - name: Check test data
+        if: ${{ vars.CI_INTEGRATION != 'false' }}
+        run: |
+          echo "Test data: $(du -sh ${TESTDATA_PATH} 2>/dev/null || echo 'empty')"
+
+      - name: Run integration tests
+        if: ${{ vars.CI_INTEGRATION != 'false' }}
+        run: |
+          if [ ! -f "tests/integration_tests/test_integration.py" ]; then
+            echo "No integration tests found, skipping"
+            exit 0
+          fi
+          USER_ARG="${{ vars.CI_DOCKER_USER && format('--user {0}', vars.CI_DOCKER_USER) || '--user root' }}"
+          docker run --rm \
+            ${USER_ARG} \
+            -v ${TESTDATA_PATH}:/geoips_testdata \
+            -v $(pwd):/workspace -w /workspace \
+            -e GEOIPS_TESTDATA_DIR=/geoips_testdata \
+            $IMAGE_TAG \
+            bash -c "
+              git config --global --add safe.directory /workspace
+              pip install -e '.[test]' pytest-html
+              create_plugin_registries
+              echo '=== base integration ==='
+              pytest -vv -m 'base and integration' \
+                tests/integration_tests/test_integration.py \
+                --no-fail-on-missing-data \
+                --html=/workspace/test-reports/integration-base.html \
+                --self-contained-html \
+                --cov=${{ env.PACKAGE_NAME }} \
+                --cov-report=html:/workspace/test-reports/coverage-integration-base
+              echo '=== full integration ==='
+              pytest -vv -m 'full and integration' \
+                tests/integration_tests/test_integration.py \
+                --no-fail-on-missing-data \
+                --html=/workspace/test-reports/integration-full.html \
+                --self-contained-html \
+                --cov=${{ env.PACKAGE_NAME }} \
+                --cov-report=html:/workspace/test-reports/coverage-integration-full
+            "
+
+      - name: Upload integration test reports
+        if: ${{ vars.CI_INTEGRATION != 'false' && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-reports
+          path: |
+            test-reports/integration-base.html
+            test-reports/integration-full.html
+            test-reports/coverage-integration-base/
+            test-reports/coverage-integration-full/
+          if-no-files-found: warn
+          retention-days: 14
+
+      # -------------------------------------------------------------------
+      # Optional: push image to registry
+      # -------------------------------------------------------------------
+
+      - name: Push image to registry
+        if: ${{ vars.ENABLE_DOCKER_REGISTRY == 'true' && env.IS_PLUGIN != 'true' }}
+        env:
+          DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+        run: |
+          echo "${DOCKER_TOKEN}" | docker login ${{ vars.DOCKER_REGISTRY }} \
+            -u ${{ vars.DOCKER_REGISTRY_USER }} --password-stdin
+
+          REMOTE_TAG="${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REGISTRY_USER }}/geoips:dev-${GITHUB_SHA}"
+          docker tag $IMAGE_TAG $REMOTE_TAG
+          docker push $REMOTE_TAG
+
+      - name: Push dev image to GHCR (core only, on merge to main)
+        if: ${{ env.IS_PLUGIN != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+            -u ${{ github.actor }} --password-stdin
+          REMOTE_TAG="ghcr.io/${{ github.repository }}:latest"
+          docker tag $IMAGE_TAG $REMOTE_TAG
+          docker push $REMOTE_TAG
+
+      # -------------------------------------------------------------------
+      # Cleanup
+      # -------------------------------------------------------------------
+
+      - name: Remove PR image
+        if: always()
+        run: docker rmi $IMAGE_TAG 2>/dev/null || true
