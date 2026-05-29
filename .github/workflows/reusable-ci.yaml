@@ -270,10 +270,10 @@ jobs:
         run: |
           TESTDATA_PATH="${INPUT_TESTDATA_PATH}"
           if [ -z "${TESTDATA_PATH}" ]; then
+            TESTDATA_PATH="/tmp/geoips_outdirs"
+          fi
           TESTDATA_PATH="$(printf '%s' "${TESTDATA_PATH}" | tr -d '\r\n')"
           printf 'TESTDATA_PATH=%s\n' "${TESTDATA_PATH}" >> "$GITHUB_ENV"
-          fi
-          echo "TESTDATA_PATH=${TESTDATA_PATH}" >> $GITHUB_ENV
 
       - name: Ensure testdata directory exists on host
         if: ${{ vars.CI_INTEGRATION != 'false' }}
