@@ -72,6 +72,13 @@ jobs:
       CURR_REPO: ${{ github.event.repository.name }}
       IS_PLUGIN: ${{ github.event.repository.name != 'geoips' }}
     steps:
+      - name: Fix workspace permissions from previous runs
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}":/workspace \
+            alpine:latest \
+            sh -c "chown -R $(id -u):$(id -g) /workspace"
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -399,6 +406,10 @@ jobs:
       # Cleanup
       # -------------------------------------------------------------------
 
-      - name: Remove PR image
+      - name: Fix workspace permissions for next run
         if: always()
-        run: docker rmi $IMAGE_TAG 2>/dev/null || true
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}":/workspace \
+            alpine:latest \
+            sh -c "chown -R $(id -u):$(id -g) /workspace"
