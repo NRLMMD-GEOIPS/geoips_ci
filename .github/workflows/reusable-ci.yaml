@@ -148,9 +148,11 @@ jobs:
 
       - name: Push build cache to GHCR
         if: ${{ env.IS_PLUGIN != 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') }}
+        env:
+          GH_REPOSITORY: ${{ github.repository }}
         run: |
-          docker tag geoips:cache ghcr.io/${{ github.repository }}:build-cache
-          docker push ghcr.io/${{ github.repository }}:build-cache
+          docker tag geoips:cache "ghcr.io/$GH_REPOSITORY:build-cache"
+          docker push "ghcr.io/$GH_REPOSITORY:build-cache"
 
       - name: Pull base image (plugin repos)
         if: ${{ env.IS_PLUGIN == 'true' }}
