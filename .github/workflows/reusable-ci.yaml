@@ -97,10 +97,14 @@ jobs:
 
       - name: Pull build cache (deps layers from previous run)
         if: ${{ env.IS_PLUGIN != 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
+          GH_REPOSITORY: ${{ github.repository }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker pull ghcr.io/${{ github.repository }}:build-cache || true
-          docker tag ghcr.io/${{ github.repository }}:build-cache geoips:cache 2>/dev/null || true
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
+          docker pull ghcr.io/$GH_REPOSITORY:build-cache || true
+          docker tag ghcr.io/$GH_REPOSITORY:build-cache geoips:cache 2>/dev/null || true
 
       - name: Build deps cache layer
         if: ${{ env.IS_PLUGIN != 'true' }}
@@ -116,10 +120,16 @@ jobs:
 
       - name: Build target image
         if: ${{ env.IS_PLUGIN != 'true' }}
+        env:
+          DOCKER_BUILD_TARGET: ${{ vars.DOCKER_BUILD_TARGET || 'geoips-site' }}
         run: |
+          if ! [[ "$DOCKER_BUILD_TARGET" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            echo "Invalid DOCKER_BUILD_TARGET: $DOCKER_BUILD_TARGET" >&2
+            exit 1
+          fi
           DOCKER_BUILDKIT=1 docker build \
             --cache-from geoips:cache \
-            --target ${{ vars.DOCKER_BUILD_TARGET || 'geoips-site' }} \
+            --target "$DOCKER_BUILD_TARGET" \
             --tag $IMAGE_TAG \
             --build-arg EXTRA_PLUGINS="${{ vars.EXTRA_PLUGINS || '' }}" \
             --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
@@ -134,10 +144,11 @@ jobs:
 
       - name: Pull base image (plugin repos)
         if: ${{ env.IS_PLUGIN == 'true' }}
+        env:
+          BASE_IMAGE: ${{ inputs.geoips_image || 'ghcr.io/nrlmmd-geoips/geoips:latest' }}
         run: |
-          BASE_IMAGE="${{ inputs.geoips_image || 'ghcr.io/nrlmmd-geoips/geoips:latest' }}"
-          docker pull $BASE_IMAGE
-          docker tag $BASE_IMAGE $IMAGE_TAG
+          docker pull "$BASE_IMAGE"
+          docker tag "$BASE_IMAGE" "$IMAGE_TAG"
 
       - name: Smoke test
         run: |
@@ -145,16 +156,21 @@ jobs:
 
       - name: Smoke test plugin
         if: ${{ env.IS_PLUGIN == 'true' }}
+        env:
+          PACKAGE_NAME_ENV: ${{ env.PACKAGE_NAME }}
         run: |
           docker run --rm --user root \
             -v $(pwd):/workspace -w /workspace \
+            -e PACKAGE_NAME_ENV="$PACKAGE_NAME_ENV" \
             $IMAGE_TAG \
-            bash -c "pip install -e . && python3 -c 'import ${{ env.PACKAGE_NAME }}; print(\"OK\")'"
+            bash -c "pip install -e . && python3 -c 'import importlib, os; importlib.import_module(os.environ[\"PACKAGE_NAME_ENV\"]); print(\"OK\")'"
 
       - name: Lint and unit tests
         id: lint
+        env:
+          CI_LINT: ${{ vars.CI_LINT }}
         run: |
-          if [ "${{ vars.CI_LINT }}" = "false" ]; then
+          if [ "$CI_LINT" = "false" ]; then
             echo "Lint disabled via CI_LINT=false"
             LINT_CMD="echo Lint skipped"
           else
@@ -237,8 +253,10 @@ jobs:
 
       - name: Set testdata path
         if: ${{ vars.CI_INTEGRATION != 'false' }}
+        env:
+          INPUT_TESTDATA_PATH: ${{ vars.TESTDATA_PATH }}
         run: |
-          TESTDATA_PATH="${{ vars.TESTDATA_PATH }}"
+          TESTDATA_PATH="${INPUT_TESTDATA_PATH}"
           if [ -z "${TESTDATA_PATH}" ]; then
             TESTDATA_PATH="${{ github.workspace }}/../.geoips-testdata"
           fi
@@ -252,8 +270,10 @@ jobs:
 
       - name: Download test datasets via ansible
         if: ${{ vars.CI_INTEGRATION != 'false' }}
+        env:
+          DOCKER_BUILD_TARGET: ${{ vars.DOCKER_BUILD_TARGET }}
         run: |
-          BUILD_TARGET="${{ vars.DOCKER_BUILD_TARGET || 'geoips-site' }}"
+          BUILD_TARGET="${DOCKER_BUILD_TARGET:-geoips-site}"
           case "$BUILD_TARGET" in
             geoips-base) TAGS="base" ;;
             geoips-full) TAGS="base,full" ;;
@@ -288,14 +308,20 @@ jobs:
 
       - name: Run integration tests
         if: ${{ vars.CI_INTEGRATION != 'false' }}
+        env:
+          CI_DOCKER_USER: ${{ vars.CI_DOCKER_USER }}
         run: |
           if [ ! -f "tests/integration_tests/test_integration.py" ]; then
             echo "No integration tests found, skipping"
             exit 0
           fi
-          USER_ARG="${{ vars.CI_DOCKER_USER && format('--user {0}', vars.CI_DOCKER_USER) || '--user root' }}"
+          DOCKER_USER="${CI_DOCKER_USER:-root}"
+          if ! printf '%s' "$DOCKER_USER" | grep -Eq '^[A-Za-z0-9_.:-]+$'; then
+            echo "Invalid CI_DOCKER_USER value"
+            exit 1
+          fi
           docker run --rm \
-            ${USER_ARG} \
+            --user "$DOCKER_USER" \
             -v ${TESTDATA_PATH}:/geoips_testdata \
             -v $(pwd):/workspace -w /workspace \
             -e GEOIPS_TESTDATA_DIR=/geoips_testdata \
@@ -348,18 +374,22 @@ jobs:
         if: ${{ vars.ENABLE_DOCKER_REGISTRY == 'true' && env.IS_PLUGIN != 'true' }}
         env:
           DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
+          DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
+          DOCKER_REGISTRY_USER: ${{ vars.DOCKER_REGISTRY_USER }}
         run: |
-          echo "${DOCKER_TOKEN}" | docker login ${{ vars.DOCKER_REGISTRY }} \
-            -u ${{ vars.DOCKER_REGISTRY_USER }} --password-stdin
+          echo "${DOCKER_TOKEN}" | docker login "$DOCKER_REGISTRY" \
+            -u "$DOCKER_REGISTRY_USER" --password-stdin
 
-          REMOTE_TAG="${{ vars.DOCKER_REGISTRY }}/${{ vars.DOCKER_REGISTRY_USER }}/geoips:dev-${GITHUB_SHA}"
+          REMOTE_TAG="${DOCKER_REGISTRY}/${DOCKER_REGISTRY_USER}/geoips:dev-${GITHUB_SHA}"
           docker tag $IMAGE_TAG $REMOTE_TAG
           docker push $REMOTE_TAG
 
       - name: Push dev image to GHCR (core only, on merge to main)
         if: ${{ env.IS_PLUGIN != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
+          echo "${GITHUB_TOKEN}" | docker login ghcr.io \
             -u ${{ github.actor }} --password-stdin
           REMOTE_TAG="ghcr.io/${{ github.repository }}:latest"
           docker tag $IMAGE_TAG $REMOTE_TAG
