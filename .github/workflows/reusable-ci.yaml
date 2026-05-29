@@ -74,14 +74,18 @@ jobs:
     steps:
       - name: Fix workspace permissions from previous runs
         run: |
-          docker run --rm \
-            -v "${GITHUB_WORKSPACE}":/workspace \
-            alpine:latest \
-            sh -c "chown -R $(id -u):$(id -g) /workspace"
+          WS="${GITHUB_WORKSPACE}"
+          if [ -n "${WS}" ] && [ -d "${WS}" ]; then
+            docker run --rm \
+              -v "${WS}":/workspace \
+              alpine:latest \
+              sh -c "chown -R $(id -u):$(id -g) /workspace" || true
+          fi
 
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          clean: false
 
       - name: Detect package name
         run: |
@@ -417,7 +421,10 @@ jobs:
       - name: Fix workspace permissions for next run
         if: always()
         run: |
-          docker run --rm \
-            -v "${GITHUB_WORKSPACE}":/workspace \
-            alpine:latest \
-            sh -c "chown -R $(id -u):$(id -g) /workspace"
+          WS="${GITHUB_WORKSPACE}"
+          if [ -n "${WS}" ] && [ -d "${WS}" ]; then
+            docker run --rm \
+              -v "${WS}":/workspace \
+              alpine:latest \
+              sh -c "chown -R $(id -u):$(id -g) /workspace" || true
+          fi
