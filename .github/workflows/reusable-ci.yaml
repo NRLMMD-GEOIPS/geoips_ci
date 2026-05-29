@@ -64,6 +64,9 @@ jobs:
   ci:
     runs-on: ${{ vars.RUNNER }}
     timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: write
     env:
       IMAGE_TAG: geoips:dev-${{ github.sha }}
       CURR_REPO: ${{ github.event.repository.name }}
@@ -92,18 +95,42 @@ jobs:
             pytest-cache-${{ github.ref }}-
           save-always: true
 
-      - name: Build image (core)
+      - name: Pull build cache (deps layers from previous run)
+        if: ${{ env.IS_PLUGIN != 'true' }}
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker pull ghcr.io/${{ github.repository }}:build-cache || true
+          docker tag ghcr.io/${{ github.repository }}:build-cache geoips:cache 2>/dev/null || true
+
+      - name: Build deps cache layer
+        if: ${{ env.IS_PLUGIN != 'true' }}
+        run: |
+          DOCKER_BUILDKIT=1 docker build \
+            --cache-from geoips:cache \
+            --target deps \
+            --tag geoips:cache \
+            --build-arg EXTRA_PLUGINS="${{ vars.EXTRA_PLUGINS || '' }}" \
+            --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
+            --progress=plain \
+            .
+
+      - name: Build target image
         if: ${{ env.IS_PLUGIN != 'true' }}
         run: |
           DOCKER_BUILDKIT=1 docker build \
             --cache-from geoips:cache \
             --target ${{ vars.DOCKER_BUILD_TARGET || 'geoips-site' }} \
             --tag $IMAGE_TAG \
-            --tag geoips:cache \
             --build-arg EXTRA_PLUGINS="${{ vars.EXTRA_PLUGINS || '' }}" \
             --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
             --progress=plain \
             .
+
+      - name: Push build cache to GHCR
+        if: ${{ env.IS_PLUGIN != 'true' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') }}
+        run: |
+          docker tag geoips:cache ghcr.io/${{ github.repository }}:build-cache
+          docker push ghcr.io/${{ github.repository }}:build-cache
 
       - name: Pull base image (plugin repos)
         if: ${{ env.IS_PLUGIN == 'true' }}
@@ -285,14 +312,19 @@ jobs:
                 --self-contained-html \
                 --cov=${{ env.PACKAGE_NAME }} \
                 --cov-report=html:/workspace/test-reports/coverage-integration-base
-              echo '=== full integration ==='
-              pytest -vv -m 'full and integration' \
-                tests/integration_tests/test_integration.py \
-                --no-fail-on-missing-data \
-                --html=/workspace/test-reports/integration-full.html \
-                --self-contained-html \
-                --cov=${{ env.PACKAGE_NAME }} \
-                --cov-report=html:/workspace/test-reports/coverage-integration-full
+              base_ram_gb=$(awk '/MemTotal/{printf "%.0f", $2/1024/1024}' /proc/meminfo)
+              if [ $base_ram_gb -lt 17 ]; then
+                echo "=== Skipping full integration: ${base_ram_gb}GB RAM (need >= 17GB) ==="
+              else
+                echo '=== full integration ==='
+                pytest -vv -m 'full and integration' \
+                  tests/integration_tests/test_integration.py \
+                  --no-fail-on-missing-data \
+                  --html=/workspace/test-reports/integration-full.html \
+                  --self-contained-html \
+                  --cov=${{ env.PACKAGE_NAME }} \
+                  --cov-report=html:/workspace/test-reports/coverage-integration-full
+              fi
             "
 
       - name: Upload integration test reports
