@@ -402,10 +402,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           echo "${GITHUB_TOKEN}" | docker login ghcr.io \
             -u "$GITHUB_ACTOR" --password-stdin
-          REMOTE_TAG="ghcr.io/${{ github.repository }}:latest"
+          REMOTE_TAG="ghcr.io/${GITHUB_REPOSITORY}:latest"
           docker tag $IMAGE_TAG $REMOTE_TAG
           docker push $REMOTE_TAG
 
