@@ -398,9 +398,10 @@ jobs:
         if: ${{ env.IS_PLUGIN != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: |
           echo "${GITHUB_TOKEN}" | docker login ghcr.io \
-            -u ${{ github.actor }} --password-stdin
+            -u "$GITHUB_ACTOR" --password-stdin
           REMOTE_TAG="ghcr.io/${{ github.repository }}:latest"
           docker tag $IMAGE_TAG $REMOTE_TAG
           docker push $REMOTE_TAG
