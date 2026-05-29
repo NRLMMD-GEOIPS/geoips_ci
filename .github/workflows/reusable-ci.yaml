@@ -115,12 +115,14 @@ jobs:
 
       - name: Build deps cache layer
         if: ${{ env.IS_PLUGIN != 'true' }}
+        env:
+          EXTRA_PLUGINS: ${{ vars.EXTRA_PLUGINS || '' }}
         run: |
           DOCKER_BUILDKIT=1 docker build \
             --cache-from geoips:cache \
             --target deps \
             --tag geoips:cache \
-            --build-arg EXTRA_PLUGINS="${{ vars.EXTRA_PLUGINS || '' }}" \
+            --build-arg EXTRA_PLUGINS="$EXTRA_PLUGINS" \
             --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
             --progress=plain \
             .
@@ -129,6 +131,7 @@ jobs:
         if: ${{ env.IS_PLUGIN != 'true' }}
         env:
           DOCKER_BUILD_TARGET: ${{ vars.DOCKER_BUILD_TARGET || 'geoips-site' }}
+          EXTRA_PLUGINS: ${{ vars.EXTRA_PLUGINS || '' }}
         run: |
           if ! [[ "$DOCKER_BUILD_TARGET" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
             echo "Invalid DOCKER_BUILD_TARGET: $DOCKER_BUILD_TARGET" >&2
@@ -138,7 +141,7 @@ jobs:
             --cache-from geoips:cache \
             --target "$DOCKER_BUILD_TARGET" \
             --tag $IMAGE_TAG \
-            --build-arg EXTRA_PLUGINS="${{ vars.EXTRA_PLUGINS || '' }}" \
+            --build-arg EXTRA_PLUGINS="$EXTRA_PLUGINS" \
             --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
             --progress=plain \
             .
