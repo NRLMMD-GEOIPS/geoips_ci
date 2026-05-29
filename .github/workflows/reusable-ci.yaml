@@ -62,7 +62,7 @@ defaults:
 
 jobs:
   ci:
-    runs-on: cira-prem #${{ vars.RUNNER }}
+    runs-on:  self-hosted  #${{ vars.RUNNER }}
     timeout-minutes: 120
     permissions:
       contents: read
