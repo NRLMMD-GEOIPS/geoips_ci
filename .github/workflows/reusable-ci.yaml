@@ -351,9 +351,9 @@ jobs:
                 --self-contained-html \
                 --cov=${{ env.PACKAGE_NAME }} \
                 --cov-report=html:/workspace/test-reports/coverage-integration-base
-              base_ram_gb=$(awk '/MemTotal/{printf "%.0f", $2/1024/1024}' /proc/meminfo)
-              if [ $base_ram_gb -lt 17 ]; then
-                echo "=== Skipping full integration: ${base_ram_gb}GB RAM (need >= 17GB) ==="
+              base_ram_gb=\$(awk '/MemTotal/{printf "%.0f", \$2/1024/1024}' /proc/meminfo)
+              if [ \$base_ram_gb -lt 17 ]; then
+                echo \"=== Skipping full integration: \${base_ram_gb}GB RAM (need >= 17GB) ===\"
               else
                 echo '=== full integration ==='
                 pytest -vv -m 'full and integration' \
