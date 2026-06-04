@@ -278,13 +278,19 @@ jobs:
             TESTDATA_PATH="/tmp/geoips_outdirs"
           fi
           TESTDATA_PATH="$(printf '%s' "${TESTDATA_PATH}" | tr -d '\r\n')"
+          case "${TESTDATA_PATH}" in
+            ""|*[!A-Za-z0-9/_\.\-]*)
+              echo "Invalid TESTDATA_PATH: contains disallowed characters"
+              exit 1
+              ;;
+          esac
           printf 'TESTDATA_PATH=%s\n' "${TESTDATA_PATH}" >> "$GITHUB_ENV"
 
       - name: Ensure testdata directory exists on host
         if: ${{ vars.CI_INTEGRATION != 'false' }}
         run: |
-          mkdir -p ${TESTDATA_PATH} || sudo mkdir -p ${TESTDATA_PATH}
-          chmod a+w ${TESTDATA_PATH}
+          mkdir -p "${TESTDATA_PATH}" || sudo mkdir -p "${TESTDATA_PATH}"
+          chmod a+w "${TESTDATA_PATH}"
 
       - name: Download test datasets via ansible
         if: ${{ vars.CI_INTEGRATION != 'false' }}
@@ -307,7 +313,7 @@ jobs:
 
           docker run --rm \
             --user root \
-            -v ${TESTDATA_PATH}:/geoips_testdata \
+            -v "${TESTDATA_PATH}:/geoips_testdata" \
             -e GEOIPS_TESTDATA_DIR=/geoips_testdata \
             $IMAGE_TAG \
             bash -c "
@@ -328,6 +334,7 @@ jobs:
         if: ${{ vars.CI_INTEGRATION != 'false' }}
         env:
           CI_DOCKER_USER: ${{ vars.CI_DOCKER_USER }}
+          PACKAGE_NAME: ${{ env.PACKAGE_NAME }}
         run: |
           if [ ! -f "tests/integration_tests/test_integration.py" ]; then
             echo "No integration tests found, skipping"
@@ -354,7 +361,7 @@ jobs:
                 --no-fail-on-missing-data \
                 --html=/workspace/test-reports/integration-base.html \
                 --self-contained-html \
-                --cov=${{ env.PACKAGE_NAME }} \
+                --cov=\"$PACKAGE_NAME\" \
                 --cov-report=html:/workspace/test-reports/coverage-integration-base
               base_ram_gb=\$(awk '/MemTotal/{printf "%.0f", \$2/1024/1024}' /proc/meminfo)
               if [ \$base_ram_gb -lt 17 ]; then
@@ -366,7 +373,7 @@ jobs:
                   --no-fail-on-missing-data \
                   --html=/workspace/test-reports/integration-full.html \
                   --self-contained-html \
-                  --cov=${{ env.PACKAGE_NAME }} \
+                  --cov=\"$PACKAGE_NAME\" \
                   --cov-report=html:/workspace/test-reports/coverage-integration-full
               fi
             "
