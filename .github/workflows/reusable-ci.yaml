@@ -185,6 +185,7 @@ jobs:
         id: lint
         env:
           CI_LINT: ${{ vars.CI_LINT }}
+          PACKAGE_NAME_ENV: ${{ env.PACKAGE_NAME }}
         run: |
           if [ "$CI_LINT" = "false" ]; then
             echo "Lint disabled via CI_LINT=false"
@@ -200,7 +201,7 @@ jobs:
             UNIT_CMD="pytest -vv tests/unit_tests \
               --html=/workspace/test-reports/unit-tests.html \
               --self-contained-html \
-              --cov=${{ env.PACKAGE_NAME }} \
+              --cov=\"$PACKAGE_NAME_ENV\" \
               --cov-report=html:/workspace/test-reports/coverage-unit"
             UPLOAD_UNIT=true
           fi
