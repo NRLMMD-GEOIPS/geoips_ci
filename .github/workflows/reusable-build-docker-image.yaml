@@ -61,6 +61,7 @@ jobs:
     env:
       CURR_REPO: ${{ github.event.repository.name }}
       DOCKER_REGISTRY_USER: ${{ vars.DOCKER_REGISTRY_USER }}
+      REPO_OWNER: ${{ github.repository_owner }}
     outputs:
       # The name of the untagged docker images to be created by this workflow
       IMAGE_NAME: ${{ steps.set_image_name.outputs.IMAGE_NAME }}
@@ -71,14 +72,16 @@ jobs:
     steps:
       - name: Set the image name
         id: set_image_name
+        env:
+          DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
         run: |
-          org=${{ github.repository_owner }}
+          org="${REPO_OWNER}"
           # Create the base image path (Organization / Repository)
           base_image="${org}/geoips"
           
-          # Prepend registry URL if vars.DOCKER_REGISTRY is set
-          if [ -n "${{ vars.DOCKER_REGISTRY }}" ]; then
-            image_name="${{ vars.DOCKER_REGISTRY }}/${base_image}"
+          # Prepend registry URL if DOCKER_REGISTRY is set
+          if [ -n "$DOCKER_REGISTRY" ]; then
+            image_name="${DOCKER_REGISTRY}/${base_image}"
           else
             image_name="${base_image}"
           fi
