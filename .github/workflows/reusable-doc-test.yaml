@@ -116,7 +116,7 @@ jobs:
       needs.get-job-flags.outputs.CI_BUILD_SPHINX_HTML == 'true' &&
       (needs.get-doclinttest-image.result == 'success' ||
       needs.get-doclinttest-image.result == 'skipped')
-    runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
+    runs-on: ${{ fromJSON(vars.RUNNER_DOCKERRUN) || vars.RUNNER }}
     needs: [get-doclinttest-image, get-job-flags]
     container:
       image: ${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}
@@ -178,7 +178,7 @@ jobs:
       needs.get-job-flags.outputs.CI_TEST_INTERFACES == 'true' &&
       (needs.get-doclinttest-image.result == 'success' ||
       needs.get-doclinttest-image.result == 'skipped')
-    runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
+    runs-on: ${{ fromJSON(vars.RUNNER_DOCKERRUN) || vars.RUNNER }}
     needs: [get-doclinttest-image, get-job-flags]
     container:
       image: ${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}
@@ -189,8 +189,8 @@ jobs:
         run: git config --global --add safe.directory $PWD
       - name: Pip install package
         run: pip install -v -e .
-      - name: create_plugin_registries
-        run: create_plugin_registries
+      - name: geoips config create-registries
+        run: geoips config create-registries
       - name: Run code check script interfaces
         run: |
           python $BASE_GEOIPS_PATH/tests/utils/test_interfaces.py
@@ -210,7 +210,7 @@ jobs:
       needs.get-job-flags.outputs.CI_TEST_PYTEST_SHORT == 'true' &&
       (needs.get-doclinttest-image.result == 'success' ||
       needs.get-doclinttest-image.result == 'skipped')
-    runs-on: ${{ vars.RUNNER_DOCKERRUN || vars.RUNNER }}
+    runs-on: ${{ fromJSON(vars.RUNNER_DOCKERRUN) || vars.RUNNER }}
     needs: [get-doclinttest-image, get-job-flags]
     container:
       image: ${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}
@@ -223,8 +223,8 @@ jobs:
         run: git config --global --add safe.directory $PWD
       - name: Pip install package
         run: pip install -v -e .
-      - name: create_plugin_registries
-        run: create_plugin_registries
+      - name: geoips config create-registries
+        run: geoips config create-registries
       # Run unit tests for this repo if they exist
       - name: Run pytest unit tests
         run: |

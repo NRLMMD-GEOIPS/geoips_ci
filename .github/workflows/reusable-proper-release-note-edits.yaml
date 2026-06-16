@@ -75,7 +75,6 @@ jobs:
       IS_VERSION_RELEASE_BRANCH: ${{ needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH }}
       CHECK_NEW_RELEASE_NOTE: ${{ needs.get-job-flags.outputs.CHECK_NEW_RELEASE_NOTE }}
       TAGGED_VERSION: ${{ needs.get-versions.outputs.TAGGED_VERSION }}
-      UPCOMING_VERSION: ${{ needs.get-versions.outputs.UPCOMING_VERSION }}
 
   #################################################
   # OLD Release Note NOT Added
@@ -86,7 +85,7 @@ jobs:
       needs.get-job-flags.outputs.CHECK_NEW_RELEASE_NOTE == 'true'
     needs: [check-release-branch, get-job-flags, get-versions]
     # This can run on the "standard" runner, no specific settings required.
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ vars.RUNNER_PYTHON || vars.RUNNER }}
     steps:
       - name: Configure Git safe directory
         run: git config --global --add safe.directory $PWD

@@ -1,5 +1,9 @@
 name: Doctest
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 # REQUIRED secrets used in this workflow:
 #   DOCKER_REGISTRY_TOKEN: token for USER user to sign into DOCKER_REGISTRY
 #
@@ -10,8 +14,6 @@ name: Doctest
 #   DOCKER_REGISTRY_USER: user to sign into DOCKER_REGISTRY
 #   RUNNER: default runner
 #   UPLOAD_GITHUB_ARTIFACTS: true/false, specify whether to upload artifacts to github
-#   USE_DOCKER_BUILDX_ACTION: true/false, specify whether to use the docker buildx
-#                             action. If false use explicit docker commands.
 
 # OPTIONAL organization level variables:
 #   # Some system implementations may require different runners for building and
@@ -25,17 +27,23 @@ name: Doctest
 on:
   # Triggers the workflow when pull request created and updated
   pull_request:
+    # Require manually kicking off CI by opening, reopening, or removing draft status.
+    # NOTE when used as a repository ruleset, these types are ignored, and
+    # opened, reopened, and synchronize are explicitly always enabled.
+    types: [opened, ready_for_review, reopened]
   # Allows run of this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
-  lint:
+  doctest:
     name: Doctest
     # You do not appear to be able to use variables in the "uses" field.
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-doc-test.yaml@main
     # Do not run doc-test on geoips_ci, .github, or test_data repos.  These repos
     # are not pip installable, so do not attempt to run.
+    # Also never run CI on draft pull requests.
     if: >
+      github.event.pull_request.draft == false &&
       !contains(github.event.repository.name, 'test_data_') &&
       github.event.repository.name != '.vscode' &&
       github.event.repository.name != 'geoips_ci' &&
