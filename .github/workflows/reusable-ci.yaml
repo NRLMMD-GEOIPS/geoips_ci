@@ -336,7 +336,7 @@ jobs:
           CI_DOCKER_USER: ${{ vars.CI_DOCKER_USER }}
           PACKAGE_NAME: ${{ env.PACKAGE_NAME }}
         run: |
-          if [ ! -f "tests/integration_tests/test_integration.py" ]; then
+          if [ ! -f "tests/integration_tests/test_*.py" ]; then
             echo "No integration tests found, skipping"
             exit 0
           fi
@@ -357,7 +357,7 @@ jobs:
               create_plugin_registries
               echo '=== base integration ==='
               pytest -vv -m 'base and integration' \
-                tests/integration_tests/test_integration.py \
+                tests/integration_tests/test_*.py \
                 --no-fail-on-missing-data \
                 --html=/workspace/test-reports/integration-base.html \
                 --self-contained-html \
@@ -369,7 +369,7 @@ jobs:
               else
                 echo '=== full integration ==='
                 pytest -vv -m 'full and integration' \
-                  tests/integration_tests/test_integration.py \
+                  tests/integration_tests/test_*.py \
                   --no-fail-on-missing-data \
                   --html=/workspace/test-reports/integration-full.html \
                   --self-contained-html \
