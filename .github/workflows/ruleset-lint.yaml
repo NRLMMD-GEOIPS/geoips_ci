@@ -23,7 +23,7 @@ jobs:
     # Only runs if the pull request is NOT a draft and this is not a test data repo
     if: >-
       github.event.pull_request.draft == false &&
-      !contains(github.event.repository.name, 'test_data\_')
+      !contains(github.event.repository.name, 'test_data')
     permissions:
       contents: read
     secrets:
