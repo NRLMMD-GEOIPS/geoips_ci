@@ -44,7 +44,7 @@ jobs:
     # Also never run CI on draft pull requests.
     if: >
       github.event.pull_request.draft == false &&
-      !contains(github.event.repository.name, 'test_data_') &&
+      !contains(github.event.repository.name, 'test_data') &&
       github.event.repository.name != '.vscode' &&
       github.event.repository.name != 'geoips_ci' &&
       github.event.repository.name != '.github'
