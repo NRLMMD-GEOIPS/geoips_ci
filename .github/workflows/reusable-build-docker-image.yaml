@@ -74,8 +74,9 @@ jobs:
         id: set_image_name
         env:
           DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
+          DOCKER_REGISTRY_NAMESPACE: ${{ vars.DOCKER_REGISTRY_NAMESPACE }}
         run: |
-          org="${REPO_OWNER}"
+          org="${DOCKER_REGISTRY_NAMESPACE}"
           # Create the base image path (Organization / Repository)
           base_image="${org}/geoips"
           
