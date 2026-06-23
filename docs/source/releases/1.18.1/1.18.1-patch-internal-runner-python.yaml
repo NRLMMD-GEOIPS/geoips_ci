@@ -1,0 +1,14 @@
+bug fix:
+- title: Use vars.RUNNER_PYTHON if it exists for workflows that require checkout python
+  description: |
+    * Ensure runner has appropriate environment for using checkout python workflow.
+  files:
+    modified:
+    - reusable-lint.yaml
+    - reusable-proper-release-note-edits.yaml
+  related-issue:
+    internal: geoips#1029 - 1.18.1 updates*
+  date:
+    start: 2026-03-30
+    finish: 2026-03-30
+

@@ -1,12 +1,20 @@
 name: Check Boxes Are Checked
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   pull_request:
-    types: [opened, edited, reopened, synchronize]
-
+    # Require manually kicking off CI by opening, reopening, or removing draft status.
+    # NOTE when used as a repository ruleset, these types are ignored, and
+    # opened, reopened, and synchronize are explicitly always enabled.
+    types: [opened, ready_for_review, reopened]
 jobs:
   pr-is-ready:
+    # Only runs if the pull request is NOT a draft
+    if: github.event.pull_request.draft == false
     name: PR Is Ready
     # You do not appear to be able to use variables in the "uses" field.
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-pr-check-boxes-complete.yaml@main
