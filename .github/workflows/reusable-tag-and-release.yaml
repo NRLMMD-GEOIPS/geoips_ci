@@ -51,7 +51,6 @@ jobs:
       # variables we have available to this workflow.
       IS_VERSION_RELEASE_BRANCH: ${{ needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH }}
       TAGGED_VERSION: ${{ needs.get-versions.outputs.TAGGED_VERSION }}
-      UPCOMING_VERSION: ${{ needs.get-versions.outputs.UPCOMING_VERSION }}
 
   tag-and-release:
     runs-on: ${{ vars.RUNNER }}

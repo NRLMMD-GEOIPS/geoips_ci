@@ -9,9 +9,6 @@ on:
       TAGGED_VERSION:
         description: "Determine version that being tagged on this release"
         value: ${{ jobs.get-versions.outputs.TAGGED_VERSION }}
-      UPCOMING_VERSION:
-        description: "Determine version that will be tagged on the next release"
-        value: ${{ jobs.get-versions.outputs.UPCOMING_VERSION }}
 
 jobs:
   get-versions:
@@ -21,7 +18,6 @@ jobs:
       contents: read
     outputs:
       TAGGED_VERSION: ${{ steps.id_versions.outputs.TAGGED_VERSION }}
-      UPCOMING_VERSION: ${{ steps.id_versions.outputs.UPCOMING_VERSION }}
     steps:
       - name: Checkout geoips repo default branch
         uses: actions/checkout@v4
@@ -53,18 +49,13 @@ jobs:
           fi
           echo "Using version directory $version_path"
           echo "tagged_version=`cat ${version_path}/tagged_version`"
-          echo "upcoming_version=`cat ${version_path}/upcoming_version`"
 
           if [[ -f ${version_path}/tagged_version ]]; then
             tagged_version=`cat ${version_path}/tagged_version`
           else
             tagged_version=latest
           fi
-          upcoming_version=`cat ${version_path}/upcoming_version`
 
           echo "TAGGED_VERSION=${tagged_version}"
           echo "TAGGED_VERSION=${tagged_version}" >> $GITHUB_ENV
           echo "TAGGED_VERSION=${tagged_version}" >> $GITHUB_OUTPUT
-          echo "UPCOMING_VERSION=${upcoming_version}"
-          echo "UPCOMING_VERSION=${upcoming_version}" >> $GITHUB_ENV
-          echo "UPCOMING_VERSION=${upcoming_version}" >> $GITHUB_OUTPUT

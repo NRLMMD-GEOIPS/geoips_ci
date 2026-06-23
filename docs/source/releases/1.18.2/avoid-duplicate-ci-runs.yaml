@@ -1,0 +1,44 @@
+actions:
+- title: 'Avoid running CI repeatedly on open PRs'
+  description: |
+    * Cancel existing CI when a new push kicks off a new CI run (we don't want to rely
+      on this one, because cancelling the CI can take some time, but keeping it in for
+      good measure)
+    * Do not run CI on draft PRs
+    * Kick off CI when converting from draft to ready for review (along with open/reopen/push).
+    * DO NOT run CI on every single push to an open PR (with synchronize on, it forces
+      all the CI to run twice when switching from draft to ready for review, so only
+      run once on ready for review or open/reopen). We now need to remember to force the
+      CI to run before PR review/approval, but should overall be faster since we won't
+      have many rounds of CI running in the background before the latest can run.
+
+    Note I included synchronize in the sync_external rulesets, since local CI cannot
+    actually be enforced. To ensure the CI runs on commits for external repositories
+    that copy these rulesets in place, include synchronize.  Add comment to external
+    rulesets that synchronize can be removed if the CI is actually set up as enforced
+    repository rulesets.
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - '.github/workflows/ruleset-doc-test.yaml'
+    - '.github/workflows/ruleset-lint.yaml'
+    - '.github/workflows/ruleset-pr-check-boxes-complete.yaml'
+    - '.github/workflows/ruleset-lint.yamlthub/workflows/ruleset-proper-release-note-edits.yaml'
+    - '.github/workflows/ruleset-proper-rst-documentation-edits.yaml'
+    - '.github/workflows/status-check.yaml'
+    - '.github/workflows/status-check.yaml'
+    - 'docs/source/releases/latest/avoid-duplicate-ci-runs.yaml'
+    - 'sync/.github/workflows/status-check.yaml'
+    - 'sync_external/.github/workflows/ruleset-doc-test.yaml'
+    - 'sync_external/.github/workflows/ruleset-lint.yaml'
+    - 'sync_external/.github/workflows/ruleset-pr-check-boxes-complete.yaml'
+    - 'sync_external/.github/workflows/ruleset-proper-release-note-edits.yaml'
+    - 'sync_external/.github/workflows/ruleset-proper-rst-documentation-edits.yaml'
+  date:
+    start: 2026-05-11
+    finish: 2026-05-11
