@@ -135,7 +135,8 @@ jobs:
   # installed using `pip install .[doc,lint,test]`. Scripts from geoips can be called
   # from /packages/geoips.
   build_doclinttest_image:
-    runs-on: ${{ fromJSON(vars.RUNNER_DOCKERRUN || vars.RUNNER) }}
+    # runs-on: ${{ fromJSON(vars.RUNNER_DOCKERRUN || vars.RUNNER) }}
+    runs-on: ${{ vars.RUNNER }}
     needs: get-job-flags
     if: >
       ! cancelled() &&
