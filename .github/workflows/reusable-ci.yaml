@@ -356,7 +356,7 @@ jobs:
               pip install -e '.[test]' pytest-html
               create_plugin_registries
               echo '=== base integration ==='
-              pytest -vv -m 'base and integration' \
+              pytest -vv --tb=short -m 'base and integration' \
                 tests/integration_tests/test_*.py \
                 --no-fail-on-missing-data \
                 --html=/workspace/test-reports/integration-base.html \
@@ -368,7 +368,7 @@ jobs:
                 echo \"=== Skipping full integration: \${base_ram_gb}GB RAM (need >= 17GB) ===\"
               else
                 echo '=== full integration ==='
-                pytest -vv -m 'full and integration' \
+                pytest -vv --tb=short -m 'full and integration' \
                   tests/integration_tests/test_*.py \
                   --no-fail-on-missing-data \
                   --html=/workspace/test-reports/integration-full.html \
@@ -399,13 +399,13 @@ jobs:
                 pip install -e . --quiet
                 create_plugin_registries
                 echo "=== $name: base integration ==="
-                pytest -vv -m "base and integration" \
+                pytest -vv --tb=short -m "base and integration" \
                   tests/integration_tests/test_*.py \
                   --no-fail-on-missing-data \
                   --html="/workspace/test-reports/$name-integration-base.html" \
                   --self-contained-html || failed="$failed $name/base"
                 echo "=== $name: full integration ==="
-                pytest -vv -m "full and integration" \
+                pytest -vv --tb=short -m "full and integration" \
                   tests/integration_tests/test_*.py \
                   --no-fail-on-missing-data \
                   --html="/workspace/test-reports/$name-integration-full.html" \
