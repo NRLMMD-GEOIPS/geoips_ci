@@ -378,6 +378,45 @@ jobs:
               fi
             "
 
+      - name: Run plugin integration tests
+        if: ${{ env.IS_PLUGIN != 'true' && vars.CI_INTEGRATION != 'false' }}
+        env:
+          CI_DOCKER_USER: ${{ vars.CI_DOCKER_USER }}
+        run: |
+          docker run --rm \
+            --user ${CI_DOCKER_USER:-root} \
+            -v ${TESTDATA_PATH}:/geoips_testdata \
+            -v $(pwd):/workspace \
+            -e GEOIPS_TESTDATA_DIR=/geoips_testdata \
+            $IMAGE_TAG \
+            bash -c '
+              failed=""
+              for pkg_dir in /packages/*/; do
+                name=$(basename "$pkg_dir")
+                [ "$name" = "geoips" ] && continue
+                ls "$pkg_dir/tests/integration_tests/test_"*.py >/dev/null 2>&1 || continue
+                cd "$pkg_dir"
+                pip install -e . --quiet
+                create_plugin_registries
+                echo "=== $name: base integration ==="
+                pytest -vv -m "base and integration" \
+                  tests/integration_tests/test_*.py \
+                  --no-fail-on-missing-data \
+                  --html="/workspace/test-reports/$name-integration-base.html" \
+                  --self-contained-html || failed="$failed $name/base"
+                echo "=== $name: full integration ==="
+                pytest -vv -m "full and integration" \
+                  tests/integration_tests/test_*.py \
+                  --no-fail-on-missing-data \
+                  --html="/workspace/test-reports/$name-integration-full.html" \
+                  --self-contained-html || failed="$failed $name/full"
+              done
+              if [ -n "$failed" ]; then
+                echo "Plugin test failures:$failed"
+                exit 1
+              fi
+            '
+
       - name: Upload integration test reports
         if: ${{ vars.CI_INTEGRATION != 'false' && always() }}
         uses: actions/upload-artifact@v4
@@ -386,6 +425,8 @@ jobs:
           path: |
             test-reports/integration-base.html
             test-reports/integration-full.html
+            test-reports/*-integration-base.html
+            test-reports/*-integration-full.html
             test-reports/coverage-integration-base/
             test-reports/coverage-integration-full/
           if-no-files-found: warn
