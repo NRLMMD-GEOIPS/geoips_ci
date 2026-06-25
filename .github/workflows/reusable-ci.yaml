@@ -379,7 +379,7 @@ jobs:
             "
 
       - name: Run plugin integration tests
-        if: ${{ env.IS_PLUGIN != 'true' && vars.CI_INTEGRATION != 'false' }}
+        if: ${{ always() && env.IS_PLUGIN != 'true' && vars.CI_INTEGRATION != 'false' }}
         env:
           CI_DOCKER_USER: ${{ vars.CI_DOCKER_USER }}
         run: |
