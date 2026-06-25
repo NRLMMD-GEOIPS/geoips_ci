@@ -336,7 +336,7 @@ jobs:
           CI_DOCKER_USER: ${{ vars.CI_DOCKER_USER }}
           PACKAGE_NAME: ${{ env.PACKAGE_NAME }}
         run: |
-          if [ ! -f "tests/integration_tests/test_*.py" ]; then
+          if ! ls tests/integration_tests/test_*.py >/dev/null 2>&1; then
             echo "No integration tests found, skipping"
             exit 0
           fi
