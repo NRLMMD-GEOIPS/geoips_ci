@@ -218,9 +218,13 @@ jobs:
               git config --global --add safe.directory /workspace
               pip install -e '.[test,lint]' pytest-html
               create_plugin_registries
+              echo '::group::Lint'
               ${LINT_CMD}
+              echo '::endgroup::'
               echo '---'
+              echo '::group::Unit tests'
               ${UNIT_CMD}
+              echo '::endgroup::'
             "
 
           echo "UPLOAD_UNIT=${UPLOAD_UNIT:-false}" >> $GITHUB_ENV
@@ -360,7 +364,7 @@ jobs:
               git config --global --add safe.directory /workspace
               pip install -e '.[test]' pytest-html
               create_plugin_registries
-              echo '=== base integration ==='
+              echo '::group::Base integration'
               pytest -vv --tb=short -m 'base and integration' \
                 tests/integration_tests/test_*.py \
                 --no-fail-on-missing-data \
@@ -368,6 +372,7 @@ jobs:
                 --self-contained-html \
                 --cov=\"$PACKAGE_NAME\" \
                 --cov-report=html:/workspace/test-reports/coverage-integration-base
+              echo '::endgroup::'
               if [ \"$CI_DEBUG_FAST\" = \"true\" ]; then
                 echo \"=== Skipping full integration: CI_DEBUG_FAST=true ===\"
               else
@@ -375,7 +380,7 @@ jobs:
                 if [ \$base_ram_gb -lt 17 ]; then
                   echo \"=== Skipping full integration: \${base_ram_gb}GB RAM (need >= 17GB) ===\"
                 else
-                  echo '=== full integration ==='
+                  echo '::group::Full integration'
                   pytest -vv --tb=short -m 'full and integration' \
                     tests/integration_tests/test_*.py \
                     --no-fail-on-missing-data \
@@ -383,6 +388,7 @@ jobs:
                     --self-contained-html \
                     --cov=\"$PACKAGE_NAME\" \
                     --cov-report=html:/workspace/test-reports/coverage-integration-full
+                  echo '::endgroup::'
                 fi
               fi
             "
@@ -400,8 +406,9 @@ jobs:
             -e CI_DEBUG_FAST \
             $IMAGE_TAG \
             bash -c '
-              echo "=== /packages/ contents ==="
+              echo "::group::Scan /packages/"
               ls -la /packages/
+              echo "::endgroup::"
               echo ""
               failed=""
               found_count=0
@@ -415,48 +422,52 @@ jobs:
                   continue
                 fi
                 found_count=$((found_count + 1))
+                echo "::group::$name"
                 echo "FOUND $name plugin repo with integration tests"
                 cd "$pkg_dir"
                 pip install -e . --quiet
                 create_plugin_registries
-                echo "=== $name: base integration ==="
+                echo "::group::Base integration"
                 if pytest -vv --tb=short -m "base and integration" \
                   tests/integration_tests/test_*.py \
                   --no-fail-on-missing-data \
                   --html="/workspace/test-reports/$name-integration-base.html" \
                   --self-contained-html; then
-                  echo "  $name/base: PASSED"
+                  echo "$name/base: PASSED"
                 else
-                  echo "  $name/base: FAILED"
+                  echo "$name/base: FAILED"
                   failed="$failed $name/base"
                 fi
+                echo "::endgroup::"
                 if [ "$CI_DEBUG_FAST" = "true" ]; then
-                  echo "  $name/full: SKIPPED (CI_DEBUG_FAST)"
+                  echo "$name/full: SKIPPED (CI_DEBUG_FAST)"
                 else
-                  echo "=== $name: full integration ==="
+                  echo "::group::Full integration"
                   if pytest -vv --tb=short -m "full and integration" \
                     tests/integration_tests/test_*.py \
                     --no-fail-on-missing-data \
                     --html="/workspace/test-reports/$name-integration-full.html" \
                     --self-contained-html; then
-                    echo "  $name/full: PASSED"
+                    echo "$name/full: PASSED"
                   else
-                    echo "  $name/full: FAILED"
+                    echo "$name/full: FAILED"
                     failed="$failed $name/full"
                   fi
+                  echo "::endgroup::"
                 fi
+                echo "::endgroup::"
               done
               echo ""
-              echo "========== Plugin Test Summary =========="
+              echo "::group::Summary"
               echo "Repos found with integration tests: $found_count"
               echo "Repos skipped (no test files):     $skip_count"
               if [ -n "$failed" ]; then
                 echo "FAILURES:$failed"
-                echo "========================================="
+                echo "::endgroup::"
                 exit 1
               fi
               echo "All plugin tests PASSED"
-              echo "========================================="
+              echo "::endgroup::"
             '
 
       - name: Upload integration test reports
