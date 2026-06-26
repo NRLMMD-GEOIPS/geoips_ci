@@ -1,0 +1,46 @@
+continuous integration:
+- title: 'Enhance reusable-ci.yaml with editable matrix, collapsible output, and stale cleanup'
+  description: |
+    Multiple enhancements to the reusable CI workflow:
+
+    * **Editable/non-editable matrix**: Added ``pip_editable`` workflow_call input
+      (default ``true``) so callers can test both editable and non-editable install
+      modes via a matrix strategy.  Passed through as ``--build-arg PIP_EDITABLE``
+      to the Docker build.
+
+    * **Architecture-aware GHCR cache**: GHCR cache tags now include
+      ``$(uname -m)`` (e.g. ``build-cache-x86_64``, ``build-cache-aarch64``) to
+      prevent cross-architecture cache collisions on pull/push.
+
+    * **Pytest lint directly**: Lint tests are now invoked via
+      ``pytest -m 'lint and not doc8'`` instead of the ``check_code.sh`` wrapper,
+      aligning with the broader pytest-native lint migration in the geoips repo.
+
+    * **``--tb=short``**: All pytest invocations (lint, unit, integration) now use
+      ``--tb=short`` for cleaner failure output in CI logs.
+
+    * **Collapsible ``::group::`` sections**: Lint, unit, base integration, full
+      integration, and plugin test output is wrapped in GitHub Actions
+      ``::group::``/``::endgroup::`` markers for more readable CI logs.
+
+    * **Plugin test execution and summary**: Added per-plugin integration test
+      execution step with per-plugin passed/failed logging and an end-of-step
+      summary section.  Uses ``always()`` to run even after integration failures.
+
+    * **``CI_DEBUG_FAST`` flag**: Setting this environment variable to ``true``
+      skips unit tests, core unit tests (plugin repos), and full integration tests,
+      enabling faster iteration during debugging.
+
+    * **``CLEAN_STALE_TESTDATA`` org variable**: Setting to ``true`` auto-deletes
+      test data directories older than 30 days before each download step.  The
+      "Check test data" step also now warns about stale directories regardless
+      of this setting.
+  files:
+    modified:
+    - .github/workflows/reusable-ci.yaml
+  related-issue:
+    number: 1261
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-06-25
+    finish: 2026-06-26
