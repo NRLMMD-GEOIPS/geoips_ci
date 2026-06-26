@@ -55,6 +55,7 @@ on:
 #   ENABLE_DOCKER_REGISTRY — set to "true" to push image to registry
 #   DOCKER_REGISTRY     — registry URL for push
 #   DOCKER_REGISTRY_USER — registry username
+#   CLEAN_STALE_TESTDATA — set to "true" to auto-delete test data dirs >30 days old
 
 defaults:
   run:
@@ -300,6 +301,18 @@ jobs:
           mkdir -p "${TESTDATA_PATH}" || sudo mkdir -p "${TESTDATA_PATH}"
           chmod a+w "${TESTDATA_PATH}"
 
+      - name: Clean stale test data
+        if: ${{ vars.CI_INTEGRATION != 'false' && vars.CLEAN_STALE_TESTDATA == 'true' }}
+        run: |
+          echo "CLEAN_STALE_TESTDATA=true — removing test data dirs >30 days old"
+          cleaned=$(find "${TESTDATA_PATH}" -maxdepth 1 -type d -name 'test_data_*' -mtime +30 -print -exec rm -rf {} \;)
+          if [ -n "$cleaned" ]; then
+            echo "$cleaned"
+            echo "These will be re-downloaded fresh in the next step."
+          else
+            echo "No stale directories to clean."
+          fi
+
       - name: Download test datasets via ansible
         if: ${{ vars.CI_INTEGRATION != 'false' }}
         env:
@@ -337,6 +350,19 @@ jobs:
         if: ${{ vars.CI_INTEGRATION != 'false' }}
         run: |
           echo "Test data: $(du -sh ${TESTDATA_PATH} 2>/dev/null || echo 'empty')"
+          stale=$(find "${TESTDATA_PATH}" -maxdepth 1 -type d -name 'test_data_*' -mtime +30 2>/dev/null)
+          if [ -n "$stale" ]; then
+            echo ""
+            echo "=== WARNING: Stale test data (>30 days old) ==="
+            echo "  Set CLEAN_STALE_TESTDATA=true org var to auto-clean."
+            echo "$stale" | while read -r d; do
+              mtime=$(stat -c %Y "$d" 2>/dev/null || stat -f %m "$d" 2>/dev/null)
+              [ -n "$mtime" ] && age=$(( ($(date +%s) - mtime) / 86400 )) && echo "  $d  (~${age}d old)"
+            done
+            echo "  stale count: $(echo "$stale" | wc -l | tr -d ' ')"
+          else
+            echo "All test data directories fresh (< 30 days)."
+          fi
 
       - name: Run integration tests
         if: ${{ vars.CI_INTEGRATION != 'false' }}
