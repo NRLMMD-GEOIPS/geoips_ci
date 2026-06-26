@@ -143,6 +143,7 @@ jobs:
         env:
           DOCKER_BUILD_TARGET: ${{ vars.DOCKER_BUILD_TARGET || 'geoips-site' }}
           EXTRA_PLUGINS: ${{ vars.EXTRA_PLUGINS || '' }}
+          PIP_EDITABLE: ${{ inputs.pip_editable }}
         run: |
           if ! [[ "$DOCKER_BUILD_TARGET" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
             echo "Invalid DOCKER_BUILD_TARGET: $DOCKER_BUILD_TARGET" >&2
@@ -154,7 +155,7 @@ jobs:
             --tag $IMAGE_TAG \
             --build-arg EXTRA_PLUGINS="$EXTRA_PLUGINS" \
             --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
-            --build-arg PIP_EDITABLE="${{ inputs.pip_editable }}" \
+            --build-arg PIP_EDITABLE="$PIP_EDITABLE" \
             --progress=plain \
             .
 
