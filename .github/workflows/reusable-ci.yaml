@@ -390,11 +390,18 @@ jobs:
             -e GEOIPS_TESTDATA_DIR=/geoips_testdata \
             $IMAGE_TAG \
             bash -c '
+              echo "=== /packages/ contents ==="
+              ls -la /packages/
+              echo ""
               failed=""
               for pkg_dir in /packages/*/; do
                 name=$(basename "$pkg_dir")
                 [ "$name" = "geoips" ] && continue
-                ls "$pkg_dir/tests/integration_tests/test_"*.py >/dev/null 2>&1 || continue
+                if ! ls "$pkg_dir/tests/integration_tests/test_"*.py >/dev/null 2>&1; then
+                  echo "SKIP $name: no test_*.py in tests/integration_tests/"
+                  continue
+                fi
+                echo "FOUND $name plugin repo with integration tests"
                 cd "$pkg_dir"
                 pip install -e . --quiet
                 create_plugin_registries
