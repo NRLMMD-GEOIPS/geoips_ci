@@ -191,7 +191,7 @@ jobs:
             echo "Lint disabled via CI_LINT=false"
             LINT_CMD="echo Lint skipped"
           else
-            LINT_CMD="/packages/geoips/tests/utils/check_code.sh all /workspace"
+            LINT_CMD="pytest -vv --tb=short -m 'lint and not doc8' /packages/geoips/tests/lint/ --lint-path /workspace"
           fi
 
           if [ ! -d "tests/unit_tests" ]; then
