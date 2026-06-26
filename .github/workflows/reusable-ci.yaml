@@ -71,7 +71,7 @@ jobs:
       IMAGE_TAG: geoips:dev-${{ github.sha }}
       CURR_REPO: ${{ github.event.repository.name }}
       IS_PLUGIN: ${{ github.event.repository.name != 'geoips' }}
-      CI_DEBUG_FAST: true
+      CI_DEBUG_FAST: false
     steps:
       - name: Fix workspace permissions from previous runs
         run: |
