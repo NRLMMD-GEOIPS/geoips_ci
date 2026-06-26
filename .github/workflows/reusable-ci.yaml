@@ -404,38 +404,59 @@ jobs:
               ls -la /packages/
               echo ""
               failed=""
+              found_count=0
+              skip_count=0
               for pkg_dir in /packages/*/; do
                 name=$(basename "$pkg_dir")
                 [ "$name" = "geoips" ] && continue
                 if ! ls "$pkg_dir/tests/integration_tests/test_"*.py >/dev/null 2>&1; then
                   echo "SKIP $name: no test_*.py in tests/integration_tests/"
+                  skip_count=$((skip_count + 1))
                   continue
                 fi
+                found_count=$((found_count + 1))
                 echo "FOUND $name plugin repo with integration tests"
                 cd "$pkg_dir"
                 pip install -e . --quiet
                 create_plugin_registries
                 echo "=== $name: base integration ==="
-                pytest -vv --tb=short -m "base and integration" \
+                if pytest -vv --tb=short -m "base and integration" \
                   tests/integration_tests/test_*.py \
                   --no-fail-on-missing-data \
                   --html="/workspace/test-reports/$name-integration-base.html" \
-                  --self-contained-html || failed="$failed $name/base"
+                  --self-contained-html; then
+                  echo "  $name/base: PASSED"
+                else
+                  echo "  $name/base: FAILED"
+                  failed="$failed $name/base"
+                fi
                 if [ "$CI_DEBUG_FAST" = "true" ]; then
-                  echo "=== Skipping $name full integration: CI_DEBUG_FAST=true ==="
+                  echo "  $name/full: SKIPPED (CI_DEBUG_FAST)"
                 else
                   echo "=== $name: full integration ==="
-                  pytest -vv --tb=short -m "full and integration" \
+                  if pytest -vv --tb=short -m "full and integration" \
                     tests/integration_tests/test_*.py \
                     --no-fail-on-missing-data \
                     --html="/workspace/test-reports/$name-integration-full.html" \
-                    --self-contained-html || failed="$failed $name/full"
+                    --self-contained-html; then
+                    echo "  $name/full: PASSED"
+                  else
+                    echo "  $name/full: FAILED"
+                    failed="$failed $name/full"
+                  fi
                 fi
               done
+              echo ""
+              echo "========== Plugin Test Summary =========="
+              echo "Repos found with integration tests: $found_count"
+              echo "Repos skipped (no test files):     $skip_count"
               if [ -n "$failed" ]; then
-                echo "Plugin test failures:$failed"
+                echo "FAILURES:$failed"
+                echo "========================================="
                 exit 1
               fi
+              echo "All plugin tests PASSED"
+              echo "========================================="
             '
 
       - name: Upload integration test reports
