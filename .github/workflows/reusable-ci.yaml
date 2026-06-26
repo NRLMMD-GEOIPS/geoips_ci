@@ -13,6 +13,11 @@ on:
         required: false
         type: boolean
         default: false
+      pip_editable:
+        description: "Enable editable pip install mode"
+        required: false
+        type: boolean
+        default: true
     secrets:
       token:
         required: false
@@ -116,8 +121,8 @@ jobs:
           GH_REPOSITORY: ${{ github.repository }}
         run: |
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
-          docker pull ghcr.io/$GH_REPOSITORY:build-cache || true
-          docker tag ghcr.io/$GH_REPOSITORY:build-cache geoips:cache 2>/dev/null || true
+          docker pull ghcr.io/$GH_REPOSITORY:build-cache-$(uname -m) || true
+          docker tag ghcr.io/$GH_REPOSITORY:build-cache-$(uname -m) geoips:cache 2>/dev/null || true
 
       - name: Build deps cache layer
         if: ${{ env.IS_PLUGIN != 'true' }}
@@ -149,6 +154,7 @@ jobs:
             --tag $IMAGE_TAG \
             --build-arg EXTRA_PLUGINS="$EXTRA_PLUGINS" \
             --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
+            --build-arg PIP_EDITABLE="${{ inputs.pip_editable }}" \
             --progress=plain \
             .
 
@@ -157,8 +163,8 @@ jobs:
         env:
           GH_REPOSITORY: ${{ github.repository }}
         run: |
-          docker tag geoips:cache "ghcr.io/$GH_REPOSITORY:build-cache"
-          docker push "ghcr.io/$GH_REPOSITORY:build-cache"
+          docker tag geoips:cache "ghcr.io/$GH_REPOSITORY:build-cache-$(uname -m)"
+          docker push "ghcr.io/$GH_REPOSITORY:build-cache-$(uname -m)"
 
       - name: Pull base image (plugin repos)
         if: ${{ env.IS_PLUGIN == 'true' }}
