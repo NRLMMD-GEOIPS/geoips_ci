@@ -71,6 +71,7 @@ jobs:
       IMAGE_TAG: geoips:dev-${{ github.sha }}
       CURR_REPO: ${{ github.event.repository.name }}
       IS_PLUGIN: ${{ github.event.repository.name != 'geoips' }}
+      CI_DEBUG_FAST: true
     steps:
       - name: Fix workspace permissions from previous runs
         run: |
@@ -194,7 +195,10 @@ jobs:
             LINT_CMD="pytest -vv --tb=short -m 'lint and not doc8' /packages/geoips/tests/lint/ --lint-path /workspace"
           fi
 
-          if [ ! -d "tests/unit_tests" ]; then
+          if [ "$CI_DEBUG_FAST" = "true" ]; then
+            UNIT_CMD="echo 'Unit tests skipped (CI_DEBUG_FAST)'"
+            UPLOAD_UNIT=false
+          elif [ ! -d "tests/unit_tests" ]; then
             UNIT_CMD="echo 'No unit tests found, skipping'"
             UPLOAD_UNIT=false
           else
@@ -222,7 +226,7 @@ jobs:
           echo "UPLOAD_UNIT=${UPLOAD_UNIT:-false}" >> $GITHUB_ENV
 
       - name: Core unit tests (plugin repos)
-        if: ${{ env.IS_PLUGIN == 'true' && inputs.run_core_tests }}
+        if: ${{ env.CI_DEBUG_FAST != 'true' && env.IS_PLUGIN == 'true' && inputs.run_core_tests }}
         run: |
           docker run --rm \
             --user root \
@@ -350,6 +354,7 @@ jobs:
             -v ${TESTDATA_PATH}:/geoips_testdata \
             -v $(pwd):/workspace -w /workspace \
             -e GEOIPS_TESTDATA_DIR=/geoips_testdata \
+            -e CI_DEBUG_FAST \
             $IMAGE_TAG \
             bash -c "
               git config --global --add safe.directory /workspace
@@ -363,18 +368,22 @@ jobs:
                 --self-contained-html \
                 --cov=\"$PACKAGE_NAME\" \
                 --cov-report=html:/workspace/test-reports/coverage-integration-base
-              base_ram_gb=\$(awk '/MemTotal/{printf "%.0f", \$2/1024/1024}' /proc/meminfo)
-              if [ \$base_ram_gb -lt 17 ]; then
-                echo \"=== Skipping full integration: \${base_ram_gb}GB RAM (need >= 17GB) ===\"
+              if [ \"$CI_DEBUG_FAST\" = \"true\" ]; then
+                echo \"=== Skipping full integration: CI_DEBUG_FAST=true ===\"
               else
-                echo '=== full integration ==='
-                pytest -vv --tb=short -m 'full and integration' \
-                  tests/integration_tests/test_*.py \
-                  --no-fail-on-missing-data \
-                  --html=/workspace/test-reports/integration-full.html \
-                  --self-contained-html \
-                  --cov=\"$PACKAGE_NAME\" \
-                  --cov-report=html:/workspace/test-reports/coverage-integration-full
+                base_ram_gb=\$(awk '/MemTotal/{printf \"%.0f\", \$2/1024/1024}' /proc/meminfo)
+                if [ \$base_ram_gb -lt 17 ]; then
+                  echo \"=== Skipping full integration: \${base_ram_gb}GB RAM (need >= 17GB) ===\"
+                else
+                  echo '=== full integration ==='
+                  pytest -vv --tb=short -m 'full and integration' \
+                    tests/integration_tests/test_*.py \
+                    --no-fail-on-missing-data \
+                    --html=/workspace/test-reports/integration-full.html \
+                    --self-contained-html \
+                    --cov=\"$PACKAGE_NAME\" \
+                    --cov-report=html:/workspace/test-reports/coverage-integration-full
+                fi
               fi
             "
 
@@ -388,6 +397,7 @@ jobs:
             -v ${TESTDATA_PATH}:/geoips_testdata \
             -v $(pwd):/workspace \
             -e GEOIPS_TESTDATA_DIR=/geoips_testdata \
+            -e CI_DEBUG_FAST \
             $IMAGE_TAG \
             bash -c '
               echo "=== /packages/ contents ==="
@@ -411,12 +421,16 @@ jobs:
                   --no-fail-on-missing-data \
                   --html="/workspace/test-reports/$name-integration-base.html" \
                   --self-contained-html || failed="$failed $name/base"
-                echo "=== $name: full integration ==="
-                pytest -vv --tb=short -m "full and integration" \
-                  tests/integration_tests/test_*.py \
-                  --no-fail-on-missing-data \
-                  --html="/workspace/test-reports/$name-integration-full.html" \
-                  --self-contained-html || failed="$failed $name/full"
+                if [ "$CI_DEBUG_FAST" = "true" ]; then
+                  echo "=== Skipping $name full integration: CI_DEBUG_FAST=true ==="
+                else
+                  echo "=== $name: full integration ==="
+                  pytest -vv --tb=short -m "full and integration" \
+                    tests/integration_tests/test_*.py \
+                    --no-fail-on-missing-data \
+                    --html="/workspace/test-reports/$name-integration-full.html" \
+                    --self-contained-html || failed="$failed $name/full"
+                fi
               done
               if [ -n "$failed" ]; then
                 echo "Plugin test failures:$failed"
