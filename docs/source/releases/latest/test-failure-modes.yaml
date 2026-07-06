@@ -6,11 +6,8 @@ enhancement:
     but are currently used to ignore the failing plugin package integration
     tests since these tests only fail in CI and not locally.
   files:
-    added:
     modified:
     - '.github/workflows/reusable-ci.yaml'
-    deleted:
-    moved:
   related-issue:
     number: null
     repo_url: ''
