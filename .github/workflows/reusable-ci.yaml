@@ -212,7 +212,7 @@ jobs:
 
       - name: Lint and unit tests
         id: lint
-        continue-on-error: ${{ continue_on_core_unit_error }}
+        continue-on-error: ${{ inputs.continue_on_core_unit_error }}
         env:
           CI_LINT: ${{ vars.CI_LINT }}
           PACKAGE_NAME_ENV: ${{ env.PACKAGE_NAME }}
@@ -260,7 +260,7 @@ jobs:
 
       - name: Core unit tests (plugin repos)
         if: ${{ env.CI_DEBUG_FAST != 'true' && env.IS_PLUGIN == 'true' && inputs.run_core_tests }}
-        continue-on-error: ${{ continue_on_plugins_unit_error }}
+        continue-on-error: ${{ inputs.continue_on_plugins_unit_error }}
         run: |
           docker run --rm \
             --user root \
