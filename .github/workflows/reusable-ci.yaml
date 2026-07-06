@@ -451,7 +451,7 @@ jobs:
 
       - name: Run plugin integration tests
         if: ${{ always() && env.IS_PLUGIN != 'true' && vars.CI_INTEGRATION != 'false' }}
-        continue-on-error: ${{ inputs.contiune_on_plugins_integ_error }}
+        continue-on-error: ${{ inputs.continue_on_plugins_integ_error }}
         env:
           CI_DOCKER_USER: ${{ vars.CI_DOCKER_USER }}
         run: |
