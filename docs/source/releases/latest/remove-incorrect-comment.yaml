@@ -1,0 +1,12 @@
+bug fix:
+- title: Remove misleading comment
+  description: |
+    This removes a misleading comment in the CI.
+  files:
+    modified:
+    - .github/workflows/reusable-package-and-publish.yaml
+  related-issue:
+    number: 
+  date:
+    start: 
+    finish: 
