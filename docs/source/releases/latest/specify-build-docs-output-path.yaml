@@ -1,0 +1,15 @@
+enhancement:
+- title: 'Add docs output path to build docs command'
+  description: |
+    deploy_pages.sh requires docs to live in docs/build,
+    specify explicit output path for build docs command
+    in deploy docs CI.
+  files:
+    modified:
+    - '.github/workflows/reusable-deploy-docs.yaml'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: 2026-07-07
+    finish: 2026-07-07
