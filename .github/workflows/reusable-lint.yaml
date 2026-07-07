@@ -98,6 +98,8 @@ jobs:
         with:
           fetch-depth: 0
           path: ./current_repo_current_branch
+      - name: Install pytest
+        run: pip install pytest
       - name: Checkout geoips default branch
         uses: actions/checkout@v4
         with:
