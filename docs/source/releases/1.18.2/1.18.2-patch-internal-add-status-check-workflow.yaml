@@ -1,0 +1,17 @@
+bug fix:
+- title: Add sync status-check.yaml workflow to allow enforcing up to date branches before merge.
+  description: |
+    GitHub update now requires a "status check" workflow before allowing checking the
+    box for "Force up to date branch before merging PR".  Add dummy status-check
+    workflow to every repository which allows enabling a status check from the org
+    with repository rulesets, where we can check the box to force up to date branches.
+  files:
+    added:
+    - sync/.github/workflows/status-check.yaml
+  related-issue:
+    internal: geoips#1029 - 1.18.2 updates*
+  date:
+    start: 2026-04-27
+    finish: 2026-04-27
+
+

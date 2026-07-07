@@ -1,0 +1,18 @@
+testing:
+- title: 'Add validation marker to pytest-based integration tests and pytest markers'
+  description: |
+    Rather than only having interfaces and plugin validation in the main geoips repo
+    (spanning all packages), include these tests in every repos integration tests,
+    to ensure they are regularly called.  Mark them with validation.
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - 'pytest.ini'
+  date:
+    start: 2026-02-26
+    finish: 2026-02-26

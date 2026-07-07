@@ -9,9 +9,6 @@ on:
       TAGGED_VERSION:
         type: string
         required: false
-      UPCOMING_VERSION:
-        type: string
-        required: false
       CHECK_NEW_RELEASE_NOTE:
         type: string
         required: false
@@ -72,7 +69,6 @@ jobs:
           echo "github.event.pull_request.merged ${{ github.event.pull_request.merged }}"
           echo "github.run_id ${{ github.run_id }}"
           echo "github.run_attempt ${{ github.run_attempt }}"
-          echo "vars.USE_CONDA_FOR_ACTIONS ${{ vars.USE_CONDA_FOR_ACTIONS }}"
           echo ""
           echo "Input variables"
           echo "---------------"
@@ -80,7 +76,6 @@ jobs:
           echo "Release flags:"
           echo "version release branch: ${{ inputs.IS_VERSION_RELEASE_BRANCH }}"
           echo "tagged version (after release): ${{ inputs.TAGGED_VERSION }}"
-          echo "upcoming version (after release): ${{ inputs.UPCOMING_VERSION }}"
           echo "CHECK_NEW_RELEASE_NOTE: ${{ inputs.CHECK_NEW_RELEASE_NOTE }}"
           echo ""
           echo "CI flags:"

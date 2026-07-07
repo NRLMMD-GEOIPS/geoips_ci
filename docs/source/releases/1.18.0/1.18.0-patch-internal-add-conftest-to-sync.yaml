@@ -1,0 +1,12 @@
+bug fix:
+- title: Add conftest.py to the sync directory
+  description: |
+    * To allow consistent pytest configurations in every repository, add to sync dir.
+  files:
+    modified:
+    - sync/tests/conftest.py
+  related-issue:
+    internal: geoips#1029 - 1.18.0 updates
+  date:
+    start: 2026-03-12
+    finish: 2026-03-12

@@ -1,0 +1,16 @@
+bug fix:
+- title: Fix integration test glob check in reusable-ci.yaml
+  description: |
+    The quoted glob ``"tests/integration_tests/test_*.py"`` in the
+    ``Run integration tests`` step prevented bash wildcard expansion,
+    causing all integration tests to be silently skipped with
+    ``No integration tests found, skipping``.
+    Replace with an unquoted ``ls``-based file-existence check.
+  files:
+    modified:
+    - .github/workflows/reusable-ci.yaml
+  related-issue:
+    number: 1261
+  date:
+    start: 2026-06-25
+    finish: 2026-06-25

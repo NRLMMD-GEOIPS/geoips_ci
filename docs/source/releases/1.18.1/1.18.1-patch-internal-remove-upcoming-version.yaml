@@ -1,0 +1,17 @@
+bug fix:
+- title: Remove unused upcoming_version
+  description: |
+    * upcoming_version was only used in order to determine and print what it was set
+      to.  It was never actually used functionally. Remove it.
+  files:
+    modified:
+    - .github/workflows/reusable-get-versions.yaml
+    - .github/workflows/reusable-print-variables.yaml
+    - .github/workflows/reusable-proper-release-note-edits.yaml
+    - .github/workflows/reusable-tag-and-release.yaml
+  related-issue:
+    internal: geoips#1029 - 1.18.1 updates*
+  date:
+    start: 2026-03-31
+    finish: 2026-03-31
+

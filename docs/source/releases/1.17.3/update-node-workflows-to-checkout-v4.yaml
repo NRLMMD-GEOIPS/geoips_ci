@@ -1,0 +1,17 @@
+actions:
+  - title: "Update nodejs based workflows to use checkout v4 and node 24"
+    description: |
+      * Update the non-pip-install nodejs based workflows to use checkout v4 and node 24.
+    files:
+      deleted:
+        - ""
+      moved:
+        - ""
+      added:
+        - ""
+      modified:
+        - ".github/workflows/reusable-cspell-spell-checking.yaml"
+        - ".github/workflows/reusable-proper-rst-documentation-edits.yaml"
+    date:
+      start: 2026-02-03
+      finish: 2026-02-03

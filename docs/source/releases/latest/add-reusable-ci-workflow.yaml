@@ -1,0 +1,39 @@
+continuous integration:
+- title: 'Add reusable CI workflow with GHCR caching and tiered integration testing'
+  description: |
+    Provides a reusable GitHub Actions workflow (``reusable-ci.yaml``) that
+    the geoips repository and plugin repositories call via ``workflow_call``.
+    This is the central CI pipeline for the GeoIPS ecosystem.
+
+    * **Build**: Multi-stage Docker build with ``deps`` cache layer pushed to /
+      pulled from GHCR for cross-run layer reuse.
+    * **Lint + unit tests**: Run in a single Docker container with configurable
+      ``CI_LINT`` org variable.
+    * **Integration tests**: Tiered test-data download (``base``, ``full``,
+      ``site``) via Ansible, followed by pytest markers run inside the container.
+      Base and full integration suites run as separate invocations within the
+      same container.
+    * **Low-RAM guard**: Full integration test suite is automatically skipped
+      when host RAM is below 17 GB, preventing OOM kills on GitHub-hosted
+      runners.
+    * **Plugin repo support**: When called from a plugin repository
+      (``IS_PLUGIN == true``), the workflow pulls the pre-built GeoIPS image
+      from GHCR instead of building from source.
+    * **Optional image push**: Push to a custom Docker registry or to GHCR
+      on merge to main.
+    * Requires org variables: ``RUNNER`` (required), ``CI_LINT``,
+      ``CI_INTEGRATION``, ``DOCKER_BUILD_TARGET``, ``TESTDATA_PATH``,
+      ``CI_DOCKER_USER``, ``ENABLE_DOCKER_REGISTRY``, ``DOCKER_REGISTRY``,
+      ``DOCKER_REGISTRY_USER``, ``EXTRA_PLUGINS``.
+  files:
+    added:
+    - '.github/workflows/reusable-ci.yaml'
+    modified: []
+    deleted: []
+    moved: []
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: null
+    finish: null
