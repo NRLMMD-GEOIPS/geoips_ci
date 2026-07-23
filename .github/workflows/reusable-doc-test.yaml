@@ -125,7 +125,7 @@ jobs:
       CURR_REPO: ${{ github.event.repository.name }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configure Git safe directory
         run: git config --global --add safe.directory $PWD
@@ -164,7 +164,7 @@ jobs:
           echo "BUILT_DOCS_PATH=$PWD/build/sphinx/html" >> $GITHUB_OUTPUT
       - name: Upload HTML Docs
         if: ${{ vars.UPLOAD_GITHUB_ARTIFACTS == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: HTML Docs
           path: ${{ steps.build-html-docs.outputs.BUILT_DOCS_PATH }}
@@ -186,7 +186,7 @@ jobs:
       image: ${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Configure Git safe directory
         run: git config --global --add safe.directory $PWD
       - name: Pip install package
@@ -221,7 +221,7 @@ jobs:
       CURR_REPO: ${{ github.event.repository.name }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Configure Git safe directory
         run: git config --global --add safe.directory $PWD
       - name: Pip install package
