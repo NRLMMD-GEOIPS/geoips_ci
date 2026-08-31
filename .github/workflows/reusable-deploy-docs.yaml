@@ -6,11 +6,11 @@ name: Deploy docs
 # 2. Package and Publish - on published release (from #1)
 #    * Build wheel
 #    * Publish to pypi
-# 3. Deploy docs - on published release (from #1)
+# 3. (THIS STEP) Deploy docs - on published release (from #1) (or as triggered)
 #    * pip install geoips
 #    * pip install plugin repo
-#    * build docs with geoips/docs/build_docs.sh
-#    * deploy docs with geoips/docs/deploy_pages.sh
+#    * build docs with geoips/docs/build_docs.py, producing artifact
+#    * deploy docs from produced artifact(s)
 
 on:
   workflow_call:
@@ -18,19 +18,79 @@ on:
       token:
         required: true
 
+env:
+  GEOIPS_DEFAULT_BRANCH: ${{ vars.GEOIPS_DEFAULT_BRANCH }} # generally 'main', for open source geoips
+  DOCS_BUILD_STRATEGY: ${{ env.DOCS_BUILD_STRATEGY }} # Current options: {'basic', 'versioned-rebuild', 'versioned-update'}
+  DOCS_MIN_VERSION: ${{ env.DOCS_MIN_VERSION }} # if not set, use all minor version families
+
 jobs:
   print-variables:
     name: Print variables
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
 
-  deploy_ghpages:
+  define-matrix:
     runs-on: ${{ vars.RUNNER }}
-    name: "Build and deploy docs to GitHub Pages"
+    name: "Determine which iterations of versions of docs should be built and deployed"
+    outputs:
+      include: ${{ steps.set-matrix.outputs.include }}
+    steps:
+      - name: Checkout current package current branch (version search)
+        if: ${{ env.DOCS_BUILD_STRATEGY == 'versioned-rebuild' || env.DOCS_BUILD_STRATEGY == 'versioned-update' }}
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+          token: ${{ secrets.token }}
+          path: current_repo_current_branch
+
+      - name: Define versions
+        id: set-matrix
+        run: | 
+          if [[ "$DOCS_BUILD_STRATEGY" == "versioned-rebuild" ]]; then
+            # First include latest default as dev, then, loop through all minor version
+            # families with non-pre releases at or above a min, target most recent point
+            include_contents="{\"current-ref\":\"$GEOIPS_DEFAULT_BRANCH\",\"dir-name\":\"dev\"}"
+            candidate_versions=$(
+              git -C current_repo_current_branch tag |
+                grep -E "^[0-9]+\.[0-9]+\.[0-9]+$" |
+                grep -oE "^[0-9]+\.[0-9]+" |
+                sort -u || true
+            )
+            IFS='.' read -a min_version_parts <<< "${DOCS_MIN_VERSION:-}"
+            while read -r this_version; do
+              [[ -z "$this_version" ]] && continue # handles case of no candidate versions
+              IFS='.' read -a this_version_parts <<< "$this_version"
+              if [[ -z "${DOCS_MIN_VERSION:-}" || "${this_version_parts[0]}" -gt "${min_version_parts[0]}" || ("${this_version_parts[0]}" == "${min_version_parts[0]}" && "${this_version_parts[1]}" -ge "${min_version_parts[1]}") ]]; then
+                latest_matching_ref=$(git -C current_repo_current_branch tag | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | grep -E "^${this_version}\.[0-9]+$" | sort -t "." -n -k3,3 -r | head -n 1)
+                include_contents="$include_contents,{\"current-ref\":\"$latest_matching_ref\",\"dir-name\":\"v$this_version\"}"
+              fi
+            done <<< "$candidate_versions"
+            echo "include=[$include_contents]" >> "$GITHUB_OUTPUT"
+          elif [[ "$DOCS_BUILD_STRATEGY" == "versioned-update" ]]; then
+            if [[ "${GITHUB_REF}" == "refs/tags/"* && ${GITHUB_REF:10} =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              this_version_dir="v"$(awk -F'.' '{print $1"."$2}' <<< "${GITHUB_REF:10}")
+              echo "include=[{\"current-ref\":\"$GEOIPS_DEFAULT_BRANCH\",\"dir-name\":\"dev\"},{\"current-ref\":\"${GITHUB_REF:10}\",\"dir-name\":\"$this_version_dir\"}]" >> "$GITHUB_OUTPUT"
+            else
+              # This is not a non-pre tagged release, so just build default main to dev
+              echo "include=[{\"current-ref\":\"$GEOIPS_DEFAULT_BRANCH\",\"dir-name\":\"dev\"}]" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            # For "$DOCS_BUILD_STRATEGY" == "basic", but is otherwise general default (including
+            # the build strategy being unspecified): Build triggering ref as "/docs"
+            echo 'include=[{"current-ref":"","dir-name":"docs"}]' >> "$GITHUB_OUTPUT"
+          fi
+
+  produce-docs-artifacts:
+    runs-on: ${{ vars.RUNNER }}
+    needs: define-matrix
+    name: "Build docs for later upload to GitHub Pages"
+    strategy:
+      matrix:
+        include: ${{ fromJSON(needs.define-matrix.outputs.include) }}
     permissions:
       contents: write
     steps:
       - name: Setup Python
-        uses: actions/setup-python@v5 # v5 is the latest for setup-python
+        uses: actions/setup-python@v5 # While not latest, v5 is known to work
         with:
           python-version: "3.11"
           check-latest: true
@@ -41,7 +101,6 @@ jobs:
       - name: Checkout geoips repo default branch
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           repository: ${{ vars.GEOIPS_ORGANIZATION }}/geoips
           ref: ${{ vars.GEOIPS_DEFAULT_BRANCH }}
           token: ${{ secrets.token }}
@@ -61,8 +120,8 @@ jobs:
       - name: Checkout current plugin current branch
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           fetch-tags: true
+          ref: ${{ matrix.current-ref }} # Note that this falls back to default (trigger reference) if empty
           token: ${{ secrets.token }}
           path: current_repo_current_branch
 
@@ -84,19 +143,17 @@ jobs:
           fi
 
       - name: pip install geoips plugin repo
+        if: ${{ steps.repo-name.outputs.repo_name != 'geoips' }} # only reinstall if this is not geoips repo
         env:
           PACKAGE_NAME: ${{ steps.package-name.outputs.package_name }}
           REPO_NAME: ${{ steps.repo-name.outputs.repo_name }}
         run: |
           which pip
-          # Do not re-install if this is the geoips repo
-          if [[ "$REPO_NAME" != "geoips" ]]; then
-              pip uninstall -y "$PACKAGE_NAME"
-              pip install -v "$PWD/current_repo_current_branch"
-              ret=$?
-              echo "${ret}"
-              python -c "import $PACKAGE_NAME; print($PACKAGE_NAME.__version__)"
-          fi
+          pip uninstall -y "$PACKAGE_NAME"
+          pip install -v "$PWD/current_repo_current_branch"
+          ret=$?
+          echo "${ret}"
+          python -c "import $PACKAGE_NAME; print($PACKAGE_NAME.__version__)"
 
       - name: create_plugin_registries
         run: |
@@ -118,11 +175,11 @@ jobs:
           
           # Ie, get 'recenter_tc' out of 'NRLMMD-GEOIPS/recenter_tc'
           curr_repo=`echo "$GITHUB_REPOSITORY" | sed "s,$GITHUB_REPOSITORY_OWNER/,,"`
-          # Call build_docs.sh from the geoips default branch
+          # Call build_docs.py from the geoips default branch
           # Pass in
           #   the path to the current plugin repo,
           #   the name of the current repo,
-          #   "html_pdf" to indicate producing both html and pdf output, and
+          #   the path to output the built html docs files
           #   the path to the docs template directory in the geoips default branch.
           # If we are specifically "template_basic_plugin" repo, then we must use
           # my_package as the package name.  Otherwise the package name matches
@@ -139,42 +196,151 @@ jobs:
             --geoips-docs-path ./geoips_default_branch/docs \
             --output-dir "./current_repo_current_branch/docs/build/sphinx/html" \
             --repo-path ./current_repo_current_branch \
-            "$curr_repo" 
-          ret=$?
-          rm -f ./geoips
-          if [[ "${ret##*:}" != *"0"* ]]; then
-            echo "::error::Building html docs ${ret##*:}"
-            exit 1
+            "$curr_repo"
+
+      - name: Upload docs (if GitHub Hosted)
+        if: ${{ runner.environment == 'github-hosted' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.dir-name }}
+          path: current_repo_current_branch/docs/build/sphinx/html
+          retention-days: 1
+
+      - name: Upload docs (if GHES)
+        if: ${{ runner.environment != 'github-hosted' }}
+        uses: actions/upload-artifact@v3.2.2
+        with:
+          name: ${{ matrix.dir-name }}
+          path: current_repo_current_branch/docs/build/sphinx/html
+          retention-days: 1
+
+  deploy-docs-artifacts:
+    runs-on: ${{ vars.RUNNER }}
+    needs: produce-docs-artifacts
+    name: "Deploy collected docs to GitHub Pages"
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout ghpages branch
+        uses: actions/checkout@v4
+        with:
+          ref: ghpages
+          token: ${{ secrets.token }}
+          path: ghpages_repo
+
+      - name: Checkout default for ancilary files (for versioned)
+        if: ${{ env.DOCS_BUILD_STRATEGY == 'versioned-rebuild' || env.DOCS_BUILD_STRATEGY == 'versioned-update' }}
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.GEOIPS_ORGANIZATION }}/geoips
+          ref: ${{ vars.GEOIPS_DEFAULT_BRANCH }}
+          token: ${{ secrets.token }}
+          path: geoips_default_branch
+
+      - name: Reset ghpages branch state (/docs only)
+        if: ${{ env.DOCS_BUILD_STRATEGY == '' || env.DOCS_BUILD_STRATEGY == 'basic' }}
+        run: |
+          cd ./ghpages_repo
+          rm -rf docs
+
+      - name: Reset ghpages branch state (full)
+        if: ${{ env.DOCS_BUILD_STRATEGY == 'versioned-rebuild' }}
+        run: |
+          cd ./ghpages_repo
+          # remove all git-tracked files
+          git ls-files | xargs -r rm
+          # remove all directories that had contained git-tracked files
+          git ls-tree --name-only -d -r -z HEAD | sort -rz | xargs -0 rmdir
+
+      - name: Reset ghpages branch state (partial)
+        if: ${{ env.DOCS_BUILD_STRATEGY == 'versioned-update' }}
+        run: |
+          cd ./ghpages_repo
+          rm -rf dev
+
+      - name: Download all docs builds (if GitHub Hosted)
+        if: ${{ runner.environment == 'github-hosted' }}
+        uses: actions/download-artifact@v8
+        with:
+          path: ghpages_repo
+          merge-multiple: false
+
+      - name: Download all docs builds (if GHES)
+        if: ${{ runner.environment != 'github-hosted' }}
+        uses: actions/download-artifact@v3
+        with:
+          path: ghpages_repo
+
+      - name: Create support files (/docs only)
+        if: ${{ env.DOCS_BUILD_STRATEGY == '' || env.DOCS_BUILD_STRATEGY == 'basic' }}
+        run: |
+          cd ./ghpages_repo
+          touch docs/.nojekyll
+
+      - name: Create all ancilary and support files (for full branch)
+        if: ${{ env.DOCS_BUILD_STRATEGY == 'versioned-rebuild' }}
+        env:
+          UNVERSIONED_URL_STRATEGY: ${{ env.UNVERSIONED_URL_STRATEGY }}
+          PACKAGE_BASE_URL: ${{ env.PACKAGE_BASE_URL }}
+        run: |
+          cd ./ghpages_repo
+          # Copy gitignore, DISTRIBUTION, and LICENSE from main repo
+          cp ../geoips_default_branch/.gitignore .
+          cp ../geoips_default_branch/DISTRIBUTION .
+          cp ../geoips_default_branch/LICENSE .
+          # Create ghpages README
+          echo "## GitHub Pages deployment branch\n\nThis branch is for docs deployment only, and is not intended to be interacted with directly." > README.md
+          # Create nojekyll
+          touch .nojekyll
+          # Update versions control file(s)
+          python3 ../geoips_default_branch/docs/create_support_files.py --scan-dir=. \
+            --output-dir=. --create-version-file --create-stable-symlink \
+            --base-url=$PACKAGE_BASE_URL
+          # Handle options for unversioned doc paths
+          if [[ "$UNVERSIONED_URL_STRATEGY" == "ignore" ]]; then
+            echo "Creating index.html redirect to stable, letting unversioned paths 404 out"
+            python3 ../geoips_default_branch/docs/create_support_files.py --output-dir=. \
+              --create-index-redirect
+          elif [[ "$UNVERSIONED_URL_STRATEGY" == "redirect" ]]; then
+            echo "Creating index.html redirect to stable and 404.html with dynamic JS redirect"
+            python3 ../geoips_default_branch/docs/create_support_files.py --output-dir=. \
+              --create-index-redirect --create-404-redirect
+          else
+            echo "Copying stable to top-level/unversioned paths"
+            cp -r stable/* .
           fi
 
-      - name: Run deploy docs
+      - name: Update support files (partial)
+        if: ${{ env.DOCS_BUILD_STRATEGY == 'versioned-update' }}
         env:
-          REPO_NAME: ${{ steps.repo-name.outputs.repo_name }}
+          UNVERSIONED_URL_STRATEGY: ${{ env.UNVERSIONED_URL_STRATEGY }}
+          PACKAGE_BASE_URL: ${{ env.PACKAGE_BASE_URL }}
+        run: |
+          cd ./ghpages_repo
+          # Update versions control file(s)
+          python3 ../geoips_default_branch/docs/create_support_files.py --scan-dir=. \
+            --output-dir=. --create-version-file --create-stable-symlink \
+            --base-url=$PACKAGE_BASE_URL
+          # Handle options for unversioned doc paths
+          if [[ "$UNVERSIONED_URL_STRATEGY" == "copy" ]]; then
+            echo "Copying stable to top-level/unversioned paths"
+            cp -r stable/* .
+          elif [[ "$UNVERSIONED_URL_STRATEGY" == "ignore" ]]; then
+            echo "Creating index.html redirect to stable, letting unversioned paths 404 out"
+            python3 ../geoips_default_branch/docs/create_support_files.py --output-dir=. \
+              --create-index-redirect
+          elif [[ "$UNVERSIONED_URL_STRATEGY" == "redirect" ]]; then
+            echo "Creating index.html redirect to stable and 404.html with dynamic JS redirect"
+            python3 ../geoips_default_branch/docs/create_support_files.py --output-dir=. \
+              --create-index-redirect --create-404-redirect
+          else
+            echo "Leaving current unversioned URL behavior unchanged"
+          fi
+
+      - name: Push to ghpages
+        env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          which pip
-          echo "Deploy docs to github pages"
-          
-          # GITHUB_REPOSITORY, GITHUB_REPOSITORY_OWNER, and GITHUB_SERVER_URL are all
-          # standard github variables defined for every github actions run.
-          # Ie, get 'recenter_tc' out of 'NRLMMD-GEOIPS/recenter_tc'
-          # ie, https://github.com/NRLMMD-GEOIPS
-          GEOIPS_REPO_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY_OWNER"
-          # Remove ghpages_repo dir if it exists.
-          # deploy_pages.sh will not run if ghpages_repo exists.
-          if [[ -d ./ghpages_repo ]]; then
-              echo "::group::remove_ghpages_before"
-              echo "Remove ghpages_repo before deploy"
-              echo "rm -rfv ./ghpages_repo"
-              rm -rfv ./ghpages_repo
-              echo "::endgroup::"
-              rmret=$?
-              if [[ "${rmret##*:}" != *"0"* ]]; then
-                echo "::error::Removing ./ghpages_repo before deploy ${rmret##*:}"
-                exit 1
-              fi
-          fi
-
           echo "Configuring Git for authentication..."
           # Use the GITHUB_TOKEN for authentication on github.com
           # This replaces any https://github.com/ URL with an authenticated one
@@ -185,43 +351,12 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          # it will fail if it exists - so remove just in case
-          if [[ -d ./ghpages_repo ]]; then
-              echo "::group::remove_ghpages_before"
-              echo "Remove ghpages_repo before deploy"
-              echo "rm -rfv ./ghpages_repo"
-              rm -rfv ./ghpages_repo
-              echo "::endgroup::"
-              rmret=$?
-              if [[ "${rmret##*:}" != *"0"* ]]; then
-                echo "::error::Removing ./ghpages_repo before deploy ${rmret##*:}"
-                exit 1
-              fi
+          # Create commit and push it
+          cd ./ghpages_repo
+          git add .
+          if git diff --cached --quiet; then
+            echo "No GitHub Pages changes to commit."
+            exit 0
           fi
-          
-          # Use the deploy_pages.sh script from the geoips default branch.
-          # Pass in the
-          #   current plugin repo path,
-          #   the geoips repo url, and
-          #   a path to a new directory for the ghpages checkout/push
-          #   the name of the current repository
-          ./geoips_default_branch/docs/deploy_pages.sh ./current_repo_current_branch "$GEOIPS_REPO_URL" ./ghpages_repo "$REPO_NAME" 
-          ret=$?
-          if [[ "${ret##*:}" != *"0"* ]]; then
-            echo "::error::Deploying docs to GitHub pages ${ret##*:}"
-            exit 1
-          fi
-          
-          # Remove ghpages_repo dir after running deploy_pages.sh.
-          if [[ -d ./ghpages_repo ]]; then
-              echo "::group::remove_ghpages_after"
-              echo "Remove ghpages_repo after deploy"
-              echo "rm -rfv ./ghpages_repo"
-              rm -rfv ./ghpages_repo
-              echo "::endgroup::"
-              rmret=$?
-              if [[ "${rmret##*:}" != *"0"* ]]; then
-                echo "::error::Removing ./ghpages_repo after deploy ${rmret##*:}"
-                exit 1
-              fi
-          fi
+          git commit -m "sphinx html for github pages"
+          git push origin ghpages
