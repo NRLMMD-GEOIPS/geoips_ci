@@ -1,0 +1,20 @@
+bug fix:
+- title: 'Add pytest plugins to install'
+  description: |
+    Testing requires multiple plugins to succeed. This PR adds
+    pytest-cov, pytest-mock, and pytest-xdist.
+  files:
+    deleted:
+    - ''
+    moved:
+    - ''
+    added:
+    - ''
+    modified:
+    - '.github/workflows/reusable-lint.yaml'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: 2026-07-08
+    finish: 2026-07-08

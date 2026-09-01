@@ -1,0 +1,12 @@
+bug fix:
+- title: 'Fix failing NodeJS 20.* dependency'
+  description: 'This updates the node version of the checkout steps to no longer depend on node 20.* which has now been deprecated by GitHub.'
+  files:
+    modified:
+    - '.github/workflows/reusable-doc-test.yaml'
+  related-issue:
+    number: null
+    repo_url: ''
+  date:
+    start: null
+    finish: null
