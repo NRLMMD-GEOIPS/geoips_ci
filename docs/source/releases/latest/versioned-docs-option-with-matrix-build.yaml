@@ -1,0 +1,31 @@
+enhancement:
+- title: 'Update Deploy docs for matrix docs build, adding multiple versions option'
+  description: >
+    Added the necessary changes to `reusable-deploy-docs.yaml` to permit versioned docs
+    building and deployment, while leaving the existing overall behavior (deploy ref
+    that triggered the workflow to the `/docs` directory of the `ghpages` branch)
+    unchanged. This includes dividing the workflow into a increased number of jobs, to
+    permit the docs build job to be run with a matrix strategy (i.e., for multiple
+    versions), and in turn using artifacts to transfer the docs files from one job to
+    the next. All options are configured using environment variables (if these are not
+    set, then the old behavior is maintained)—namely `DOCS_BUILD_STRATEGY`, which if
+    set to "versioned-rebuild" builds docs for all minor versions since
+    `DOCS_MIN_VERSION` (if `DOCS_MIN_VERSION` is not set, then all minor versions)
+    (this is the new intended behavior for open source GeoIPS), and if
+    "versioned-update" simply builds `GEOIPS_DEFAULT_BRANCH` and then also, if
+    triggered by a non-pre release tag, that version (this is an envisioned future
+    necessity for when the number of minor versions becomes too large). Then,
+    `UNVERSIONED_URL_STRATEGY` is intended as future behavior, allowing a flexible
+    approach to how "old" URLs (those without versions in their paths) are handled, and
+    `PACKAGE_BASE_URL` need only be set for non-`geoips` packages opting-in to using
+    versioned docs (as the default defined in `geoips/docs/create_support_files.py` is
+    anticipated to be applicable for geoips proper).
+  files:
+    modified:
+    - '.github/workflows/reusable-deploy-docs.yaml'
+  related-issue:
+    number: 1480
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips/'
+  date:
+    start: '2026-08-31'
+    finish: '2026-09-09'
