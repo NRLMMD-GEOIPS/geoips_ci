@@ -19,9 +19,9 @@ on:
         required: true
 
 env:
-  GEOIPS_DEFAULT_BRANCH: ${{ vars.GEOIPS_DEFAULT_BRANCH }} # generally 'main', for open source geoips
-  DOCS_BUILD_STRATEGY: ${{ vars.DOCS_BUILD_STRATEGY }} # Current options: {'basic', 'versioned-rebuild', 'versioned-update'}
-  DOCS_MIN_VERSION: ${{ vars.DOCS_MIN_VERSION }} # if not set, use all minor version families
+  GEOIPS_DEFAULT_BRANCH: ${{ vars.GEOIPS_DEFAULT_BRANCH }} # (generally 'main', for open source geoips)
+  DOCS_BUILD_STRATEGY: ${{ vars.DOCS_BUILD_STRATEGY }} # REVIEW (Current options: {'basic', 'versioned-rebuild', 'versioned-update'})
+  DOCS_MIN_VERSION: ${{ vars.DOCS_MIN_VERSION }} # REVIEW (if not set, and using 'versioned-rebuild', builds all minor version families; not used in other build strategies)
 
 jobs:
   print-variables:
@@ -219,7 +219,7 @@ jobs:
             "$curr_repo"
 
       - name: Upload docs (if GitHub Hosted)
-        uses: actions/upload-artifact@v7 # GHES requires a downgrade to v3.2.2 (no change to arguments)
+        uses: actions/upload-artifact@v7 # REVIEW: GHES requires a downgrade to v3.2.2 (no change to arguments)
         with:
           name: ${{ matrix.dir-name }}
           path: current_repo_current_branch/docs/build/sphinx/html
@@ -292,7 +292,7 @@ jobs:
           rm -rf dev
 
       - name: Download all docs builds (if GitHub Hosted)
-        uses: actions/download-artifact@v8  # GHES requires a downgrade to v3.2.2 (no change to arguments)
+        uses: actions/download-artifact@v8  # REVIEW: GHES requires a downgrade to v3 (no change to arguments)
         with:
           path: ghpages_repo
 
@@ -305,8 +305,8 @@ jobs:
       - name: Create all ancilary and support files (for full branch)
         if: ${{ env.DOCS_BUILD_STRATEGY == 'versioned-rebuild' }}
         env:
-          UNVERSIONED_URL_STRATEGY: ${{ vars.UNVERSIONED_URL_STRATEGY }}
-          PACKAGE_BASE_URL: ${{ vars.PACKAGE_BASE_URL }}
+          UNVERSIONED_URL_STRATEGY: ${{ vars.UNVERSIONED_URL_STRATEGY }} # REVIEW (Current options: {'ignore', 'redirect', 'copy', 'none'}; Default behavior is 'copy' if building 'versioned-rebuild', and 'none' for 'versioned-update'. Not used for 'basic' (i.e., not versioned))
+          PACKAGE_BASE_URL: ${{ vars.PACKAGE_BASE_URL }} # REVIEW (If empty, defaults to default of docs/create_support_files.py, which is 'https://nrlmmd-geoips.github.io/geoips/'; generally ought to be 'https://{{ GEOIPS_ORGANIZATION }}.github.io/{{ REPO_NAME }}/' unless using a custom domain. This is only relevant for versioned builds (as it is for the version switcher config file).)
         run: |
           cd ./ghpages_repo
           # Copy gitignore, DISTRIBUTION, LICENSE, and workflows from main repo
@@ -339,8 +339,8 @@ jobs:
       - name: Update support files (partial)
         if: ${{ env.DOCS_BUILD_STRATEGY == 'versioned-update' }}
         env:
-          UNVERSIONED_URL_STRATEGY: ${{ vars.UNVERSIONED_URL_STRATEGY }}
-          PACKAGE_BASE_URL: ${{ vars.PACKAGE_BASE_URL }}
+          UNVERSIONED_URL_STRATEGY: ${{ vars.UNVERSIONED_URL_STRATEGY }} # REVIEW (as above)
+          PACKAGE_BASE_URL: ${{ vars.PACKAGE_BASE_URL }} # REVIEW (as above)
         run: |
           cd ./ghpages_repo
           # Update versions control file(s)
