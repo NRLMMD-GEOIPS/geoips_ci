@@ -48,10 +48,11 @@ jobs:
             version_path=./geoips_repo_default_branch/.github/versions
           fi
           echo "Using version directory $version_path"
-          echo "tagged_version=$(cat "${version_path}/tagged_version")"
 
           if [[ -f ${version_path}/tagged_version ]]; then
-            tagged_version=$(cat "${version_path}/tagged_version")
+            # Drop whitespace (trailing newline, CRLF). Not echoed before validation:
+            # printing untrusted text could inject workflow commands.
+            tagged_version=$(tr -d ' \t\r\n' < "${version_path}/tagged_version")
           else
             tagged_version=latest
           fi

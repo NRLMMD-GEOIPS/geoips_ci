@@ -25,6 +25,11 @@ name: Fork pull request gate
 #   workflows" -> "Require approval for all outside collaborators", which GitHub
 #   enforces before any workflow file from the fork is executed.
 #
+# WHAT APPROVING MEANS: an approved fork run executes the pull request's code on
+#   the self-hosted runner (as root inside containers, with the workspace and the
+#   test data directory mounted), and can leave files there for later runs. Only
+#   approve after reviewing the code as you would before merging it.
+#
 # Setup (once per repository, Settings -> Environments):
 #   1. Create an environment named "fork-approval" (or pass a different name).
 #   2. Add an organization team as "Required reviewers".
