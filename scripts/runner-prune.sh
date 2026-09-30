@@ -1,22 +1,35 @@
 #!/usr/bin/env bash
 # Remove GeoIPS CI leftovers from a self-hosted runner whose Docker daemon is
-# SHARED with other users. Only CI-owned material is touched:
-#   - stopped containers labelled geoips-ci=true
-#   - unused images labelled geoips-ci=true (built by reusable-ci.yaml)
-#   - older CI images without that label (built before labelling existed): images
-#     whose ONLY tag is geoips:dev-* or geoips:cache
-#   - superseded dangling images pulled from ${CI_IMAGE_REPO} (the GeoIPS base image)
-#   - stale test_data_* dirs in TESTDATA_PATH (weekly)
-#   - geoips*/pytest-of-* items in /tmp and old runner _temp entries
-# It never runs docker system/builder/volume prune and never removes dangling
-# or third-party images. Images still used by a container are never removed.
+# SHARED with other users. Only material this CI creates is touched:
+#   - stopped containers labelled geoips-ci=true. reusable-ci.yaml labels every
+#     container it starts. Images are deliberately NOT labelled: image labels are
+#     published with the image and inherited by every container created from it,
+#     so other users' containers would match too.
+#   - labelled CI containers still running after CI_ORPHAN_HOURS (default 6; the CI
+#     job timeout is 2 hours): left behind by cancelled jobs
+#   - images whose tags are all CI tags (geoips:dev-<40-hex commit>[-<run>-<attempt>]
+#     or geoips:cache), older than the age limit counted from their last tag time.
+#     An image that also has any other tag is kept.
+#   - only with PRUNE_DANGLING_GEOIPS_IMAGES=true: dangling (untagged) images whose
+#     registry digest is from ${CI_IMAGE_REPO}. Docker cannot tell whether CI or
+#     another user pulled them, so this is off by default; reusable-ci.yaml already
+#     removes the images its own pulls and tags leave untagged.
+#   - weekly, and only with CLEAN_STALE_TESTDATA=true: test_data_* directories in
+#     TESTDATA_PATH that were not modified for 30 days (they are re-downloaded)
+#   - runner _temp entries older than 2 days
+# It never runs docker system/builder/volume prune, never removes other dangling
+# or tagged images, never uses `docker rmi -f` (images used by any container are
+# kept), and never deletes anything in /tmp.
 #
 # Usage: runner-prune.sh (--nightly | --weekly) [--dry-run]
-#   TESTDATA_PATH  test data dir (default: ~/.geoips-testdata)
-#   CI_IMAGE_REPO  registry repo of the base image (default: ghcr.io/nrlmmd-geoips/geoips)
+#   TESTDATA_PATH                 test data dir (default: ~/.geoips-testdata)
+#   CLEAN_STALE_TESTDATA          "true" to allow removing stale test data (weekly only)
+#   CI_IMAGE_REPO                 registry repo of the GeoIPS image (default: ghcr.io/nrlmmd-geoips/geoips)
+#   PRUNE_DANGLING_GEOIPS_IMAGES  "true" to also remove dangling images from CI_IMAGE_REPO
+#   CI_ORPHAN_HOURS               running CI containers older than this are orphans (default: 6)
 #
-# Written for bash 3.2+ (no arrays, no GNU-only options except `date -d`, which
-# is only used to age-check legacy images and is skipped if unavailable).
+# Written for bash 3.2+ (no arrays). Ages need GNU `date -d`; anything whose age
+# cannot be determined is kept.
 set -uo pipefail
 
 MODE=""; DRY=false
@@ -31,23 +44,69 @@ done
 [ -z "$MODE" ] && { echo "Usage: $0 (--nightly|--weekly) [--dry-run]" >&2; exit 2; }
 
 TESTDATA_PATH="${TESTDATA_PATH:-$HOME/.geoips-testdata}"
-# Registry repository the CI pulls the GeoIPS base image from (lowercase).
+CLEAN_STALE_TESTDATA="${CLEAN_STALE_TESTDATA:-false}"
 CI_IMAGE_REPO="${CI_IMAGE_REPO:-ghcr.io/nrlmmd-geoips/geoips}"
+PRUNE_DANGLING_GEOIPS_IMAGES="${PRUNE_DANGLING_GEOIPS_IMAGES:-false}"
+CI_ORPHAN_HOURS="${CI_ORPHAN_HOURS:-6}"
+# Tags reusable-ci.yaml creates; anything else under geoips:dev-* may be a person's.
+CI_TAG_RE='^geoips:dev-[0-9a-f]{40}(-[0-9]+-[0-9]+)?$'
 # Only images older than this are removed. Nightly keeps two days of history.
 if [ "$MODE" = nightly ]; then AGE_HOURS=48; else AGE_HOURS=24; fi
 AGE_SECONDS=$((AGE_HOURS * 3600))
+now=$(date +%s)
 
 report() {
-  df -h / /tmp "${TESTDATA_PATH}" 2>/dev/null
+  df -h / "${TESTDATA_PATH}" 2>/dev/null
   echo "CI images:"
-  docker images --filter "label=geoips-ci=true" || true
-  docker images --filter "reference=geoips:dev-*" || true
-  docker images --filter "reference=geoips:cache" || true
+  docker images --filter "reference=geoips:*" || true
+  docker images "${CI_IMAGE_REPO}" || true
 }
 
-# Skip while a CI container is running on this host.
-if [ -n "$(docker ps -q --filter label=geoips-ci=true)" ]; then
-  echo "CI containers are running; skipping prune."
+# old_enough <Created (RFC 3339)> <last tag time, epoch seconds, or ""> <label>:
+# true if both the creation and the last tag time are older than AGE_HOURS. The
+# last tag time matters for images CI re-tagged recently (a pulled image tagged
+# geoips:dev-*). Docker reports it via {{.Metadata.LastTagTime.Unix}}.
+old_enough() {
+  local t1 t2
+  [ -n "$1" ] && t1=$(date -d "$1" +%s 2>/dev/null) || t1=""
+  if [ -z "$t1" ]; then
+    echo "  keep $3 (cannot parse creation time '$1'; needs GNU date)"
+    return 1
+  fi
+  t2=$2
+  case "$t2" in ''|*[!0-9-]*) t2=0 ;; esac
+  [ "$t2" -gt "$t1" ] && t1=$t2
+  if [ $((now - t1)) -le "$AGE_SECONDS" ]; then
+    echo "  keep $3 (created or tagged within ${AGE_HOURS}h)"
+    return 1
+  fi
+  return 0
+}
+
+is_ci_tag() {
+  [ "$1" = "geoips:cache" ] || [[ "$1" =~ $CI_TAG_RE ]]
+}
+
+# Running CI containers: skip the prune while a job is using the runner, but do
+# not wait forever on containers a cancelled job left running.
+running=""; orphans=""
+for c in $(docker ps -q --filter label=geoips-ci=true); do
+  started=$(docker inspect -f '{{.State.StartedAt}}' "$c" 2>/dev/null) || started=""
+  s=""
+  [ -n "$started" ] && s=$(date -d "$started" +%s 2>/dev/null) || s=""
+  if [ -n "$s" ] && [ $((now - s)) -gt $((CI_ORPHAN_HOURS * 3600)) ]; then
+    orphans="$orphans $c"
+  else
+    running="$running $c"
+  fi
+done
+if [ -n "$orphans" ]; then
+  echo "+ CI containers running longer than ${CI_ORPHAN_HOURS}h (left by cancelled jobs):$orphans"
+  # shellcheck disable=SC2086
+  $DRY || docker rm -f $orphans || true
+fi
+if [ -n "$running" ]; then
+  echo "CI containers are running:$running; skipping prune."
   exit 0
 fi
 
@@ -60,82 +119,49 @@ else
   docker container prune -f --filter label=geoips-ci=true || true
 fi
 
-# `docker image prune` is the only image command with an `until` filter. With
-# label=geoips-ci=true it only considers our images, and it never removes an
-# image that a container still references.
-echo "+ unused CI-labelled images older than ${AGE_HOURS}h"
-if $DRY; then
-  echo "(dry run: would run docker image prune -a -f --filter label=geoips-ci=true --filter until=${AGE_HOURS}h)"
-  docker images --filter "label=geoips-ci=true" || true
-else
-  docker image prune -a -f --filter "label=geoips-ci=true" --filter "until=${AGE_HOURS}h" || true
+echo "+ images tagged only with CI tags (geoips:dev-<sha>..., geoips:cache), older than ${AGE_HOURS}h"
+ids=$( { docker images --filter "reference=geoips:dev-*" --format '{{.ID}}'
+         docker images --filter "reference=geoips:cache" --format '{{.ID}}'; } | sort -u )
+for id in $ids; do
+  info=$(docker image inspect --format '{{.Created}}|{{.Metadata.LastTagTime.Unix}}|{{join .RepoTags " "}}' "$id") || continue
+  created=${info%%|*}; rest=${info#*|}; tagged=${rest%%|*}; tags=${rest#*|}
+  other=""
+  for t in $tags; do
+    is_ci_tag "$t" || other="$other $t"
+  done
+  if [ -n "$other" ]; then
+    echo "  keep $tags (not only CI tags:$other)"
+    continue
+  fi
+  old_enough "$created" "$tagged" "$tags" || continue
+  echo "  remove $tags"
+  # Untag each CI tag; the image is deleted with its last tag unless a container uses it.
+  # shellcheck disable=SC2086
+  $DRY || docker rmi $tags || true
+done
+
+if [ "$PRUNE_DANGLING_GEOIPS_IMAGES" = "true" ]; then
+  echo "+ dangling images from ${CI_IMAGE_REPO}, older than ${AGE_HOURS}h"
+  for id in $(docker images --filter dangling=true --format '{{.ID}}'); do
+    info=$(docker image inspect --format '{{.Created}}|{{join .RepoDigests " "}}' "$id") || continue
+    created=${info%%|*}; digests=${info#*|}
+    case " $digests" in
+      *" ${CI_IMAGE_REPO}@"*) ;;
+      *) continue ;;   # not from the GeoIPS registry repo: never touched
+    esac
+    old_enough "$created" "" "$id" || continue
+    echo "  remove $id"
+    $DRY || docker rmi "$id" || true
+  done
 fi
 
-# Older CI images have no label. Match by our tag names, but only when that tag is
-# the image's only tag: a retagged shared image (plugin runs tag the pulled org
-# image as geoips:dev-<sha>) would give no disk benefit and could race a live run.
-echo "+ unlabelled legacy CI images (sole tag geoips:dev-* or geoips:cache) older than ${AGE_HOURS}h"
-now=$(date +%s)
-for pattern in 'geoips:dev-*' 'geoips:cache'; do
-  for ref in $(docker images --filter "reference=${pattern}" --format '{{.Repository}}:{{.Tag}}'); do
-    info=$(docker image inspect --format '{{.Created}} {{len .RepoTags}}' "$ref") || continue
-    created=${info%% *}; ntags=${info##* }
-    [ "$ntags" = "1" ] || { echo "  keep $ref (image has $ntags tags)"; continue; }
-    created_epoch=$(date -d "$created" +%s 2>/dev/null) || created_epoch=""
-    if [ -z "$created_epoch" ]; then
-      echo "  keep $ref (cannot parse creation time '$created'; needs GNU date)"
-      continue
-    fi
-    if [ $((now - created_epoch)) -le "$AGE_SECONDS" ]; then
-      echo "  keep $ref (newer than ${AGE_HOURS}h)"
-      continue
-    fi
-    echo "  remove $ref"
-    # No -f: an image in use by any container is left alone.
-    $DRY || docker rmi "$ref" || true
-  done
-done
-
-# Plugin runs pull the GeoIPS base image; when its tag moves, the previous image
-# becomes an unlabelled dangling image. A registry-pulled image keeps its
-# RepoDigests, so it can be identified as ours by repository and removed. Other
-# dangling images (other users') are never touched.
-echo "+ superseded dangling images pulled from ${CI_IMAGE_REPO} older than ${AGE_HOURS}h"
-for id in $(docker images --filter dangling=true --format '{{.ID}}'); do
-  info=$(docker image inspect --format '{{.Created}}|{{range .RepoDigests}}{{.}} {{end}}' "$id") || continue
-  created=${info%%|*}; digests=${info#*|}
-  case " $digests" in
-    *" ${CI_IMAGE_REPO}@"*) ;;
-    *) continue ;;
-  esac
-  created_epoch=$(date -d "$created" +%s 2>/dev/null) || created_epoch=""
-  if [ -z "$created_epoch" ]; then
-    echo "  keep $id (cannot parse creation time '$created'; needs GNU date)"
-    continue
-  fi
-  if [ $((now - created_epoch)) -le "$AGE_SECONDS" ]; then
-    echo "  keep $id (newer than ${AGE_HOURS}h)"
-    continue
-  fi
-  echo "  remove $id"
-  # No -f: an image in use by any container is left alone.
-  $DRY || docker rmi "$id" || true
-done
-
-if [ "$MODE" = weekly ] && [ -d "$TESTDATA_PATH" ]; then
-  echo "+ test_data_* dirs older than 30 days in $TESTDATA_PATH"
+if [ "$MODE" = weekly ] && [ "$CLEAN_STALE_TESTDATA" = "true" ] && [ -d "$TESTDATA_PATH" ]; then
+  echo "+ test_data_* dirs not modified for 30 days in $TESTDATA_PATH"
   if $DRY; then
     find "$TESTDATA_PATH" -maxdepth 1 -type d -name 'test_data_*' -mtime +30 -print
   else
     find "$TESTDATA_PATH" -maxdepth 1 -type d -name 'test_data_*' -mtime +30 -print -exec rm -rf {} + || true
   fi
-fi
-
-echo "+ /tmp leftovers owned by $(id -un)"
-if $DRY; then
-  find /tmp -maxdepth 1 -user "$(id -u)" \( -name 'geoips*' -o -name 'pytest-of-*' \) -mtime +2 -print 2>/dev/null
-else
-  find /tmp -maxdepth 1 -user "$(id -u)" \( -name 'geoips*' -o -name 'pytest-of-*' \) -mtime +2 -print -exec rm -rf {} + 2>/dev/null || true
 fi
 
 echo "+ runner _temp entries older than 2 days"

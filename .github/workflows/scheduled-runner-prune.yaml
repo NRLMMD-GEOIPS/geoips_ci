@@ -1,8 +1,9 @@
 name: Scheduled runner prune
 
-# Removes leftover GeoIPS CI material only (labelled CI containers, images tagged
-# only geoips:dev-*/geoips:cache, superseded dangling GeoIPS images, and stale test
-# data if CLEAN_STALE_TESTDATA=true). The Docker daemon is shared, so no
+# Removes leftover GeoIPS CI material only: labelled CI containers (and ones a
+# cancelled job left running), images tagged only with CI tags (geoips:dev-<sha>...,
+# geoips:cache), and optionally dangling GeoIPS images
+# (PRUNE_DANGLING_GEOIPS_IMAGES=true) and stale test data (CLEAN_STALE_TESTDATA=true). The Docker daemon is shared, so no
 # system/builder/volume prune is ever run. See scripts/runner-prune.sh.
 #
 # The self-hosted runner must be available to this repository (runner group
@@ -46,6 +47,7 @@ jobs:
         env:
           TESTDATA_PATH: ${{ vars.TESTDATA_PATH }}
           CLEAN_STALE_TESTDATA: ${{ vars.CLEAN_STALE_TESTDATA }}
+          PRUNE_DANGLING_GEOIPS_IMAGES: ${{ vars.PRUNE_DANGLING_GEOIPS_IMAGES }}
           SCHEDULE: ${{ github.event.schedule }}
           INPUT_MODE: ${{ inputs.mode }}
           INPUT_DRY: ${{ inputs.dry_run }}

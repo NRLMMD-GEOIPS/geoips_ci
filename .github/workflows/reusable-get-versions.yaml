@@ -50,9 +50,10 @@ jobs:
           echo "Using version directory $version_path"
 
           if [[ -f ${version_path}/tagged_version ]]; then
-            # Drop whitespace (trailing newline, CRLF). Not echoed before validation:
-            # printing untrusted text could inject workflow commands.
-            tagged_version=$(tr -d ' \t\r\n' < "${version_path}/tagged_version")
+            # Drop spaces, CR and blank lines; a file with more than one version line
+            # keeps its newline and fails the check below. Not echoed before
+            # validation: printing untrusted text could inject workflow commands.
+            tagged_version=$(tr -d ' \t\r' < "${version_path}/tagged_version" | grep -v '^$' || true)
           else
             tagged_version=latest
           fi
