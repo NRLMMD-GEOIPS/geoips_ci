@@ -3,6 +3,14 @@ name: Check release notes for proper edits
 on:
   # Reusable workflow
   workflow_call:
+    inputs:
+      fork_approval_environment:
+        description: >
+          GitHub Environment (with required reviewers) that must approve a run
+          before pull requests from forks may execute on the self-hosted runner
+        required: false
+        type: string
+        default: "fork-approval"
     secrets:
       token:
         required: true
@@ -24,12 +32,24 @@ defaults:
     shell: bash
 
 jobs:
+  # Fork pull requests wait here for approval by a required reviewer, see
+  # reusable-fork-gate.yaml. Every job below depends on this gate.
+  fork-gate:
+    name: Fork approval gate
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-fork-gate.yaml@main
+    with:
+      environment: ${{ inputs.fork_approval_environment }}
+
   check-release-branch:
     name: Check release branch
+    needs: [fork-gate]
+    if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-check-release-branch.yaml@main
 
   get-versions:
     name: Get versions
+    needs: [fork-gate]
+    if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-get-versions.yaml@main
     permissions:
       contents: read
@@ -38,6 +58,8 @@ jobs:
 
   # Set variables that should be accessible to all jobs
   get-job-flags:
+    needs: [fork-gate]
+    if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
     runs-on: ${{ vars.RUNNER }}
     outputs:
       CHECK_NEW_RELEASE_NOTE: ${{ steps.get_job_flags.outputs.CHECK_NEW_RELEASE_NOTE }}
@@ -55,18 +77,19 @@ jobs:
               # Check if the secret value is "true" and set the environment variable and output
               if [ "$val" == "false" ]; then
                   echo "${flag}=false"
-                  echo "${flag}=false" >> $GITHUB_ENV
-                  echo "${flag}=false" >> $GITHUB_OUTPUT
+                  echo "${flag}=false" >> "$GITHUB_ENV"
+                  echo "${flag}=false" >> "$GITHUB_OUTPUT"
               else
                   echo "${flag}=true"
-                  echo "${flag}=true" >> $GITHUB_ENV
-                  echo "${flag}=true" >> $GITHUB_OUTPUT
+                  echo "${flag}=true" >> "$GITHUB_ENV"
+                  echo "${flag}=true" >> "$GITHUB_OUTPUT"
               fi
           done
 
   print-variables:
     name: Print variables
-    needs: [check-release-branch, get-job-flags]
+    needs: [fork-gate, check-release-branch, get-job-flags, get-versions]
+    if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
     with:
       # These are outputs defined in the check-release-branch and get-versions
@@ -82,15 +105,16 @@ jobs:
   check_release_notes:
     if: >
       always() &&
+      needs.fork-gate.outputs.allowed == 'true' &&
       needs.get-job-flags.outputs.CHECK_NEW_RELEASE_NOTE == 'true'
-    needs: [check-release-branch, get-job-flags, get-versions]
+    needs: [fork-gate, check-release-branch, get-job-flags, get-versions]
     # This can run on the "standard" runner, no specific settings required.
     runs-on: ${{ vars.RUNNER_PYTHON || vars.RUNNER }}
     steps:
       - name: Configure Git safe directory
-        run: git config --global --add safe.directory $PWD
+        run: git config --global --add safe.directory "$PWD"
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           check-latest: true
@@ -110,10 +134,10 @@ jobs:
               target_ref=${{ github.event.repository.default_branch }}
           fi
           echo "git -C $PWD/current_repo_current_branch fetch"
-          git -C $PWD/current_repo_current_branch fetch
+          git -C "$PWD/current_repo_current_branch" fetch
           echo "git -C $PWD/current_repo_current_branch diff --ignore-space-at-eol --stat --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst"
-          ret=$(git -C $PWD/current_repo_current_branch diff --ignore-space-at-eol --stat --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst)
-          for file in ${ret[@]}; do
+          ret=$(git -C "$PWD/current_repo_current_branch" diff --ignore-space-at-eol --stat --diff-filter=AM remotes/origin/${target_ref} -- "$release_notes_dir"/*.rst)
+          for file in ${ret}; do
               echo "    $file"
           done
           if [ -z "$ret" ]; then
@@ -121,7 +145,7 @@ jobs:
           else
               echo ::group::Full Git Diff
               echo "git -C $PWD/current_repo_current_branch diff --ignore-space-at-eol --stat --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst"
-              git -C $PWD/current_repo_current_branch diff --ignore-space-at-eol --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.rst
+              git -C "$PWD/current_repo_current_branch" diff --ignore-space-at-eol --diff-filter=AM remotes/origin/${target_ref} -- "$release_notes_dir"/*.rst
               echo ::endgroup::
               echo "FAILED: Release note changes detected"
               echo "Please use brassy to enter change logs in $release_notes_dir"
@@ -141,12 +165,14 @@ jobs:
           ! cancelled() &&
           github.ref_name != github.event.repository.default_branch &&
           needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH != 'true'
+        env:
+          IS_VERSION_RELEASE_BRANCH: ${{ needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH }}
         run: |
           echo "Checking for new and modified YAML release note files in $PWD"
           echo ${{ needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH }}
           #update_this_file="$(cat update_this_release_note)"
           release_notes_dir="$PWD/current_repo_current_branch/docs/source/releases/latest" #/$(dirname $update_this_file)"
-          ls $release_notes_dir
+          ls "$release_notes_dir"
           if [[ "${{ github.base_ref }}" != "" ]]; then
               target_ref=${{ github.base_ref }}
           else
@@ -154,18 +180,18 @@ jobs:
           fi
           #current_release_note=`cat update_this_release_note`
           echo "git -C $PWD/current_repo_current_branch fetch"
-          git -C $PWD/current_repo_current_branch fetch
+          git -C "$PWD/current_repo_current_branch" fetch
           # If this is the final release branch, then we are just moving release notes,
           # note modifying.  In that case, allow renamed as well as added or modified.
-          if [[ ${{ needs.check-release-branch.outputs.IS_VERSION_RELEASE_BRANCH == 'true' }} ]]; then
+          if [[ "$IS_VERSION_RELEASE_BRANCH" == "true" ]]; then
             echo "git -C ./current_repo_current_branch diff --ignore-space-at-eol --stat --diff-filter=RAM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml"
-            ret=$(git -C ./current_repo_current_branch diff --ignore-space-at-eol --stat --diff-filter=RAM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml)
+            ret=$(git -C ./current_repo_current_branch diff --ignore-space-at-eol --stat --diff-filter=RAM remotes/origin/${target_ref} -- "$release_notes_dir"/*.yaml)
           else
             echo "git -C ./current_repo_current_branch diff --ignore-space-at-eol --stat --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml"
-            ret=$(git -C ./current_repo_current_branch diff --ignore-space-at-eol --stat --diff-filter=AM remotes/origin/${target_ref} -- $release_notes_dir/*.yaml)
+            ret=$(git -C ./current_repo_current_branch diff --ignore-space-at-eol --stat --diff-filter=AM remotes/origin/${target_ref} -- "$release_notes_dir"/*.yaml)
           fi
           echo "Release note files modified this PR:"
-          for file in ${ret[@]}; do
+          for file in ${ret}; do
               echo "    $file"
           done
           if [ -z "$ret" ]; then
@@ -227,17 +253,21 @@ jobs:
         run: |
           vers="${TAGGED_VERSION}"
           reldir=./current_repo_current_branch/docs/source/releases/$vers
-          bugfix_internal_relnote=$reldir/${vers}-patch-internal-*.yaml
-          bugfix_os_relnote=$reldir/${vers}-patch-os-*.yaml
-          nobugfix_relnote=$reldir/${vers}-no-bug-fixes-required-on-this-release.yaml
+          bugfix_internal_relnote="$reldir/${vers}-patch-internal-*.yaml"
+          bugfix_os_relnote="$reldir/${vers}-patch-os-*.yaml"
+          nobugfix_relnote="$reldir/${vers}-no-bug-fixes-required-on-this-release.yaml"
           reponame="$REPO_NAME"
-          if [[ "$reponame" != "template_"* && "`ls $bugfix_os_relnote`" == "" && "`ls $bugfix_internal_relnote`" == "" && "`ls $nobugfix_relnote`" == "" ]]; then
+          # compgen -G succeeds only if the glob pattern matches an existing file
+          if [[ "$reponame" != "template_"* ]] \
+              && ! compgen -G "$bugfix_os_relnote" > /dev/null \
+              && ! compgen -G "$bugfix_internal_relnote" > /dev/null \
+              && ! compgen -G "$nobugfix_relnote" > /dev/null; then
             echo "FAILED: Non-template repo does not have the bug fix or no bug fix release note in the $vers directory, and is a release branch"
             echo "Please add one of"
             echo "    * $bugfix_internal_relnote"
             echo "    * $bugfix_os_relnote"
             echo "    * $nobugfix_relnote"
-            ls -l ./current_repo_current_branch/docs/source/releases/$vers
+            ls -l "./current_repo_current_branch/docs/source/releases/$vers"
             exit 1
           else
             echo "PASSED"

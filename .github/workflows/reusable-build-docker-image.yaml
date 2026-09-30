@@ -6,8 +6,9 @@ on:
     secrets:
       token:
         required: true
+      # Not available to pull requests from forks, so it cannot be required.
       docker_token:
-        required: true
+        required: false
     outputs:
       DOCKER_IMAGE_NAME:
         description: "Name of docker image to be used"
@@ -60,6 +61,9 @@ jobs:
     runs-on: ${{ vars.RUNNER }}
     env:
       CURR_REPO: ${{ github.event.repository.name }}
+      # Pull requests from forks have no registry credentials and cannot push
+      # the per-commit image, so they use the same image as plugin repos.
+      IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
       DOCKER_REGISTRY_USER: ${{ vars.DOCKER_REGISTRY_USER }}
       REPO_OWNER: ${{ github.repository_owner }}
     outputs:
@@ -91,30 +95,30 @@ jobs:
           image_name="${image_name,,}"
 
           echo "IMAGE_NAME=${image_name}"
-          echo "IMAGE_NAME=${image_name}" >> ${GITHUB_ENV}
-          echo "IMAGE_NAME=${image_name}" >> ${GITHUB_OUTPUT}
+          echo "IMAGE_NAME=${image_name}" >> "$GITHUB_ENV"
+          echo "IMAGE_NAME=${image_name}" >> "$GITHUB_OUTPUT"
       - name: Set doclinttest image tag
         id: set_doclinttest_tag
         run: |
           echo "CURR_REPO: ${CURR_REPO}"
           # If the current repository is geoips, use the image we're about to build
-          # for running tests and building docs.
-          if [[ "${CURR_REPO}" == "geoips" ]]; then
+          # for running tests and building docs. Fork pull requests cannot push
+          # that image, so they fall through to the shared latest image.
+          if [[ "${CURR_REPO}" == "geoips" && "${IS_FORK}" != "true" ]]; then
               echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}"
-              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}" >> ${GITHUB_ENV}
-              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}" >> ${GITHUB_OUTPUT}
+              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}" >> "$GITHUB_ENV"
+              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           else
               echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}"
-              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}" >> ${GITHUB_ENV}
-              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}" >> ${GITHUB_OUTPUT}
+              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}" >> "$GITHUB_ENV"
+              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}" >> "$GITHUB_OUTPUT"
           fi
       - name: Set doclinttest image
         id: set_doclinttest_image
         run: |
-          doclinttest_image_name=${IMAGE_NAME}:${DOCLINTTEST_TAG}
           echo "DOCLINTTEST_IMAGE=${IMAGE_NAME}:${DOCLINTTEST_TAG}"
-          echo "DOCLINTTEST_IMAGE=${IMAGE_NAME}:${DOCLINTTEST_TAG}" >> ${GITHUB_ENV}
-          echo "DOCLINTTEST_IMAGE=${IMAGE_NAME}:${DOCLINTTEST_TAG}" >> ${GITHUB_OUTPUT}
+          echo "DOCLINTTEST_IMAGE=${IMAGE_NAME}:${DOCLINTTEST_TAG}" >> "$GITHUB_ENV"
+          echo "DOCLINTTEST_IMAGE=${IMAGE_NAME}:${DOCLINTTEST_TAG}" >> "$GITHUB_OUTPUT"
 
   print-build-image-variables:
     name: Print build image variables
@@ -139,9 +143,12 @@ jobs:
     # runs-on: ${{ fromJSON(vars.RUNNER_DOCKERRUN || vars.RUNNER) }}
     runs-on: ${{ vars.RUNNER }}
     needs: get-job-flags
+    # Never for fork pull requests: no registry credentials, and the push would
+    # publish fork-built images under this repository's tags.
     if: >
       ! cancelled() &&
-      github.event.repository.name == 'geoips'
+      github.event.repository.name == 'geoips' &&
+      !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
     env:
       IMAGE_NAME: ${{ needs.get-job-flags.outputs.IMAGE_NAME }}
       BUILDCACHE_IMAGE: ${{ needs.get-job-flags.outputs.IMAGE_NAME }}:buildcache
@@ -206,7 +213,7 @@ jobs:
           fi
           # PUSH_TAGS is used with the docker buildx action
           echo "PUSH_TAGS=${tags}"
-          echo "PUSH_TAGS=${tags}" >> $GITHUB_ENV
+          echo "PUSH_TAGS=${tags}" >> "$GITHUB_ENV"
 
       - name: Build and push docker image with docker buildx action
         # References the below commit, which matched both v6 and v6.12.0 at the time

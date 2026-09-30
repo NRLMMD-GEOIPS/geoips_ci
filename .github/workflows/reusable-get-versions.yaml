@@ -48,14 +48,22 @@ jobs:
             version_path=./geoips_repo_default_branch/.github/versions
           fi
           echo "Using version directory $version_path"
-          echo "tagged_version=`cat ${version_path}/tagged_version`"
+          echo "tagged_version=$(cat "${version_path}/tagged_version")"
 
           if [[ -f ${version_path}/tagged_version ]]; then
-            tagged_version=`cat ${version_path}/tagged_version`
+            tagged_version=$(cat "${version_path}/tagged_version")
           else
             tagged_version=latest
           fi
 
+          # This file may come from a pull request (including from a fork), and the
+          # value is used in shell scripts and written to GITHUB_ENV/GITHUB_OUTPUT
+          # by other jobs: accept only a single plain version string.
+          if ! [[ "${tagged_version}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            echo "::error::tagged_version must be a single version string made of letters, digits, '.', '_' or '-'"
+            exit 1
+          fi
+
           echo "TAGGED_VERSION=${tagged_version}"
-          echo "TAGGED_VERSION=${tagged_version}" >> $GITHUB_ENV
-          echo "TAGGED_VERSION=${tagged_version}" >> $GITHUB_OUTPUT
+          echo "TAGGED_VERSION=${tagged_version}" >> "$GITHUB_ENV"
+          echo "TAGGED_VERSION=${tagged_version}" >> "$GITHUB_OUTPUT"

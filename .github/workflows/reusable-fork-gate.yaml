@@ -1,0 +1,98 @@
+name: Fork pull request gate
+
+# Decides whether a workflow run may use the self-hosted runner.
+#
+#   * Not a fork pull request  -> allowed immediately.
+#   * Fork pull request        -> the "approval" job below is bound to a GitHub
+#                                 Environment with required reviewers. Nothing
+#                                 is allowed until a reviewer approves, and the
+#                                 run is denied if the reviewer rejects it.
+#
+# Every job that runs on a self-hosted runner in a calling workflow must:
+#   needs: [fork-gate, ...]
+#   if: needs.fork-gate.outputs.allowed == 'true'  (&& any other condition)
+# The explicit `if` is required because jobs that use always() or !cancelled()
+# in their own `if` would otherwise still run when the gate was denied.
+#
+# LIMITS - read before relying on this:
+#   For a pull_request event GitHub runs the workflow files from the pull
+#   request's own merge commit. A fork can therefore edit or remove this gate
+#   in any workflow that lives in the pull request's repository (for example
+#   integ_test.yaml). The gate is only tamper-proof for workflows that a pull
+#   request cannot change: the ruleset-*.yaml workflows of this repository when
+#   they are used as organization ruleset "required workflows". For in-repo
+#   workflows also enable Settings -> Actions -> General -> "Fork pull request
+#   workflows" -> "Require approval for all outside collaborators", which GitHub
+#   enforces before any workflow file from the fork is executed.
+#
+# Setup (once per repository, Settings -> Environments):
+#   1. Create an environment named "fork-approval" (or pass a different name).
+#   2. Add an organization team as "Required reviewers".
+#   3. Do NOT restrict deployment branches, fork PRs run on refs/pull/*/merge.
+# Without required reviewers GitHub creates the environment with no protection,
+# and fork pull requests would then be allowed without approval.
+#
+# Each workflow run that calls this gate needs its own approval, and a new push
+# to the pull request is a new run that needs approval again.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "GitHub Environment (with required reviewers) that approves fork runs"
+        required: false
+        type: string
+        default: "fork-approval"
+    outputs:
+      allowed:
+        description: "'true' if this run may use self-hosted runners, anything else means do not run"
+        value: ${{ jobs.result.outputs.allowed }}
+      is_fork:
+        description: "'true' if this run is a pull request from a fork"
+        value: ${{ jobs.result.outputs.is_fork }}
+
+jobs:
+  # Only created for fork pull requests, and intentionally on a GitHub-hosted
+  # runner: no fork code is checked out and nothing here touches self-hosted.
+  # A deleted fork leaves head.repo empty, which is also treated as a fork.
+  approval:
+    if: >-
+      ${{ (github.event_name == 'pull_request' || github.event_name == 'pull_request_target')
+      && github.event.pull_request.head.repo.full_name != github.repository }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Fork run approved by a required reviewer
+        run: echo "A required reviewer approved running this fork pull request on the self-hosted runner."
+
+  result:
+    needs: approval
+    # !cancelled() rather than always(): a cancelled run must not proceed.
+    # If this job does not run, `allowed` is empty and every consumer skips.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    outputs:
+      allowed: ${{ steps.decide.outputs.allowed }}
+      is_fork: ${{ steps.decide.outputs.is_fork }}
+    steps:
+      - name: Decide
+        id: decide
+        env:
+          APPROVAL_RESULT: ${{ needs.approval.result }}
+        run: |
+          # The approval job is skipped exactly when this is not a fork PR.
+          case "$APPROVAL_RESULT" in
+            skipped) is_fork=false; allowed=true ;;
+            success) is_fork=true;  allowed=true ;;
+            *)       is_fork=true;  allowed=false ;;
+          esac
+          echo "is_fork=${is_fork}" >> "$GITHUB_OUTPUT"
+          echo "allowed=${allowed}" >> "$GITHUB_OUTPUT"
+          echo "Fork pull request: ${is_fork}; self-hosted allowed: ${allowed} (approval: ${APPROVAL_RESULT})"
+          if [ "$allowed" != "true" ]; then
+            echo "::warning::Fork pull request was not approved; self-hosted jobs will be skipped."
+          fi

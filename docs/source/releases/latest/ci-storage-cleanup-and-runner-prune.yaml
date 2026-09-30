@@ -1,0 +1,39 @@
+continuous integration:
+- title: 'Stop self-hosted CI from filling /tmp and Docker storage'
+  description: |
+    The self-hosted runner shares its Docker daemon with other users, so all
+    cleanup is limited to material created by this CI. Nothing runs
+    ``docker system prune``, ``docker builder prune`` or removes dangling or
+    third-party images.
+
+    * Every container and image built by ``reusable-ci.yaml`` is labelled
+      ``geoips-ci=true``.
+    * ``reusable-ci.yaml`` removes its own ``geoips:dev-<sha>`` image and stopped
+      labelled containers at the end of every run, clears old ``test-reports`` at
+      the start, and prunes unused CI-labelled images older than 24 hours when
+      free space on the Docker root is below ``CI_MIN_FREE_GB`` (default 40).
+    * Test data no longer defaults to ``/tmp/geoips_outdirs``; it defaults to
+      ``~/.geoips-testdata``. Set the ``TESTDATA_PATH`` variable to override.
+    * ``CLEAN_STALE_TESTDATA`` is now on by default and removes ``test_data_*``
+      directories older than 30 days. Set it to ``false`` to disable.
+    * New ``scripts/runner-prune.sh`` (``--nightly``, ``--weekly``, ``--dry-run``)
+      and ``scheduled-runner-prune.yaml`` remove stopped CI-labelled containers,
+      unused CI-labelled images older than 48 hours (24 hours weekly), older
+      unlabelled ``geoips:dev-*``/``geoips:cache`` images whose only tag is ours,
+      superseded dangling copies of the GeoIPS base image pulled from
+      ``ghcr.io/nrlmmd-geoips/geoips`` (override with ``CI_IMAGE_REPO``),
+      stale test data (weekly), and ``geoips*``/``pytest-of-*`` leftovers in
+      ``/tmp``. It skips the run while a CI container is running and never
+      removes images that are in use.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+    added:
+    - '.github/workflows/scheduled-runner-prune.yaml'
+    - 'scripts/runner-prune.sh'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-09-30
+    finish: 2026-09-30

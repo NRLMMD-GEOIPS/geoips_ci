@@ -55,12 +55,14 @@ jobs:
     name: Print variables
     steps:
       - name: Print run flags
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           echo "Standard variables:"
           echo "github.ref_name ${{ github.ref_name }}"
           echo "github.ref ${{ github.ref }}"
           echo "github.base_ref ${{ github.base_ref }}"
-          echo "github.head_ref ${{ github.head_ref }}"
+          echo "github.head_ref ${HEAD_REF}"
           echo "vars.RUNNER ${{ vars.RUNNER }}"
           echo "vars.RUNNER_DOCKERBUILD ${{ vars.RUNNER_DOCKERBUILD }}"
           echo "vars.RUNNER_DOCKERRUN ${{ vars.RUNNER_DOCKERRUN }}"
@@ -96,18 +98,10 @@ jobs:
           echo ""
           echo "Github context:"
           echo "$GITHUB_CONTEXT"
-          echo ${{ github.context }}
           echo ""
           echo "Running as user:"
           whoami
 
-          # for var in $(echo '${{ toJson(needs.set-variables.outputs) }}' | jq -r 'keys[]'); do
-          if [[ "${{ inputs.FLAGS }}" != "" ]]; then
-            for var in $(echo '${{ toJson(inputs.FLAGS) }}' | jq -r 'keys[]'); do
-              value=$(echo '${{ toJson(inputs.FLAGS) }}' | jq -r --arg var "$var" '.[$var]')
-              echo "$var=$value"
-            done
-          fi
           echo "Target ref:"
           if [[ "${{ github.base_ref }}" != "" ]]; then
               target_ref=${{ github.base_ref }}

@@ -1,0 +1,29 @@
+continuous integration:
+- title: 'Run unit, lint and integration tests for every plugin in reusable CI'
+  description: |
+    The core GeoIPS run of ``reusable-ci.yaml`` now runs, for every plugin
+    repository found in the image, the plugin unit tests (``unit_tests`` and
+    ``unit_tests_long``), linting, and the base and full integration tests.
+    Previously only integration tests were run for plugins.
+
+    * A per-plugin, per-suite result table is written to the job summary and
+      uploaded with the integration reports.
+    * One failing plugin suite no longer stops the remaining plugins from running.
+    * ``continue_on_plugins_unit_error`` covers plugin unit and lint failures,
+      ``continue_on_plugins_integ_error`` covers plugin integration failures.
+
+    Plugin repositories get a new ``sync/.github/workflows/integ_test.yaml``
+    that calls ``reusable-ci.yaml`` with ``run_core_tests: true``, so a pull
+    request to a plugin repository is tested against the pull request branch
+    instead of the copy of the plugin baked into the image.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+    added:
+    - 'sync/.github/workflows/integ_test.yaml'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-09-30
+    finish: 2026-09-30
