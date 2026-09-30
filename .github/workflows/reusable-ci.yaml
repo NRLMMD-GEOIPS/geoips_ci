@@ -87,6 +87,8 @@ on:
 #   ENABLE_DOCKER_REGISTRY — set to "true" to push image to registry
 #   DOCKER_REGISTRY     — registry URL for push
 #   DOCKER_REGISTRY_USER — registry username
+#   CLEAN_STALE_TESTDATA — set to "true" to auto-delete test data dirs >30 days old
+#   CI_MIN_FREE_GB      — free disk space (GB) below which stale CI images are removed (default: 40)
 #
 # FORK PULL REQUESTS:
 #   For pull_request events whose head repo differs from this repo, the CI job
@@ -99,8 +101,6 @@ on:
 #   NOTE: a fork can edit an in-repo caller workflow and drop this gate. Also
 #   enable "Require approval for all outside collaborators" in the repository
 #   or organization Actions settings, see reusable-fork-gate.yaml.
-#
-#   CLEAN_STALE_TESTDATA — auto-delete test data dirs >30 days old (default on; set "false" to disable)
 
 defaults:
   run:
@@ -112,7 +112,7 @@ jobs:
   # unless needs.fork-gate.outputs.allowed == 'true'.
   fork-gate:
     name: Fork approval gate
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-fork-gate.yaml@main
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-fork-gate.yaml@@run-all-the-tests
     with:
       environment: ${{ inputs.fork_approval_environment }}
 
@@ -160,19 +160,28 @@ jobs:
           done
           echo "Lowest free space: ${free_gb:-unknown}GB (minimum ${MIN_FREE_GB}GB)"
           if [ -n "${free_gb}" ] && [ "${free_gb}" -lt "${MIN_FREE_GB}" ]; then
-            echo "::warning::Low disk space (${free_gb}GB); removing unused CI images older than 24h"
-            # Only images labelled geoips-ci=true, and never one a container still uses:
-            # the daemon is shared with other users. (`docker images` has no `until`
-            # filter, `docker image prune` does.)
-            docker image prune -a -f --filter "label=geoips-ci=true" --filter "until=24h" || true
-            { echo "### Low disk space"; echo "Free was ${free_gb}GB; pruned unused CI-labelled images older than 24h."; } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::Low disk space (${free_gb}GB); removing stale CI images (geoips:dev-*) older than 24h"
+            # The daemon is shared with other users: only images whose ONLY tag is a
+            # geoips:dev-* tag from an earlier run, and never one a container uses
+            # (no -f). scripts/runner-prune.sh in geoips_ci does the full cleanup.
+            now=$(date +%s)
+            for ref in $(docker images --filter "reference=geoips:dev-*" --format '{{.Repository}}:{{.Tag}}'); do
+              info=$(docker image inspect --format '{{.Created}} {{len .RepoTags}}' "$ref") || continue
+              created=$(date -d "${info%% *}" +%s 2>/dev/null) || continue
+              if [ "${info##* }" = "1" ] && [ $((now - created)) -gt 86400 ]; then
+                echo "Removing stale CI image ${ref}"
+                docker rmi "$ref" || true
+              fi
+            done
+            { echo "### Low disk space"; echo "Free was ${free_gb}GB; removed stale geoips:dev-* CI images older than 24h."; } >> "$GITHUB_STEP_SUMMARY"
           fi
           docker system df || true
 
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # Never reuse a workspace that earlier runs (or fork code) touched.
+          # Fork runs remove untracked files left by earlier runs. Trusted runs keep
+          # the workspace as before (clean: false).
           clean: ${{ env.IS_FORK == 'true' }}
 
       - name: Detect package name
@@ -208,6 +217,9 @@ jobs:
           GH_ACTOR: ${{ github.actor }}
           GH_REPOSITORY: ${{ github.repository }}
         run: |
+          # Remember the current local cache image so the next step can remove it once
+          # it has been replaced: an untagged image cannot be identified as ours later.
+          printf 'OLD_CACHE_ID=%s\n' "$(docker image inspect -f '{{.Id}}' geoips:cache 2>/dev/null || true)" >> "$GITHUB_ENV"
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
           docker pull "ghcr.io/$GH_REPOSITORY:build-cache-$(uname -m)" || true
           docker tag "ghcr.io/$GH_REPOSITORY:build-cache-$(uname -m)" geoips:cache 2>/dev/null || true
@@ -218,7 +230,6 @@ jobs:
           EXTRA_PLUGINS: ${{ vars.EXTRA_PLUGINS || '' }}
         run: |
           DOCKER_BUILDKIT=1 docker build \
-            --label geoips-ci=true \
             --cache-from geoips:cache \
             --target deps \
             --tag geoips:cache \
@@ -226,6 +237,12 @@ jobs:
             --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
             --progress=plain \
             .
+          # Remove the previous cache image if this build replaced it. docker rmi without
+          # -f keeps it if it is still tagged elsewhere or used by a container.
+          new_id=$(docker image inspect -f '{{.Id}}' geoips:cache 2>/dev/null || true)
+          if [ -n "${OLD_CACHE_ID}" ] && [ "${OLD_CACHE_ID}" != "${new_id}" ]; then
+            docker rmi "${OLD_CACHE_ID}" 2>/dev/null || true
+          fi
 
       - name: Build target image
         if: ${{ env.IS_PLUGIN != 'true' }}
@@ -239,7 +256,6 @@ jobs:
             exit 1
           fi
           DOCKER_BUILDKIT=1 docker build \
-            --label geoips-ci=true \
             --cache-from geoips:cache \
             --target "$DOCKER_BUILD_TARGET" \
             --tag "$IMAGE_TAG" \
@@ -393,6 +409,11 @@ jobs:
               ;;
           esac
           printf 'TESTDATA_PATH=%s\n' "${TESTDATA_PATH}" >> "$GITHUB_ENV"
+          # /tmp/geoips_outdirs was the default before; it is never deleted automatically
+          # because another repository may still use it through its own TESTDATA_PATH.
+          if [ "${TESTDATA_PATH}" != "/tmp/geoips_outdirs" ] && [ -d /tmp/geoips_outdirs ]; then
+            echo "::warning::/tmp/geoips_outdirs (the old default TESTDATA_PATH) still exists but this run uses ${TESTDATA_PATH}. If no CI uses it any more, delete it to free /tmp."
+          fi
 
       - name: Ensure testdata directory exists on host
         if: ${{ vars.CI_INTEGRATION != 'false' }}
@@ -401,9 +422,9 @@ jobs:
           chmod a+w "${TESTDATA_PATH}"
 
       - name: Clean stale test data
-        if: ${{ vars.CI_INTEGRATION != 'false' && vars.CLEAN_STALE_TESTDATA != 'false' }}
+        if: ${{ vars.CI_INTEGRATION != 'false' && vars.CLEAN_STALE_TESTDATA == 'true' }}
         run: |
-          echo "Removing test data dirs >30 days old"
+          echo "CLEAN_STALE_TESTDATA=true — removing test data dirs >30 days old"
           cleaned=$(find "${TESTDATA_PATH}" -maxdepth 1 -type d -name 'test_data_*' -mtime +30 -print -exec rm -rf {} \;)
           if [ -n "$cleaned" ]; then
             echo "$cleaned"
@@ -453,7 +474,7 @@ jobs:
           if [ -n "$stale" ]; then
             echo ""
             echo "=== WARNING: Stale test data (>30 days old) ==="
-            echo "  Unset CLEAN_STALE_TESTDATA (or leave != false) to auto-clean."
+            echo "  Set CLEAN_STALE_TESTDATA=true org var to auto-clean."
             echo "$stale" | while read -r d; do
               mtime=$(stat -c %Y "$d" 2>/dev/null || stat -f %m "$d" 2>/dev/null)
               [ -n "$mtime" ] && age=$(( ($(date +%s) - mtime) / 86400 )) && echo "  $d  (~${age}d old)"
@@ -630,7 +651,8 @@ jobs:
       - name: Plugin test summary
         if: ${{ always() && env.IS_PLUGIN != 'true' && vars.CI_INTEGRATION != 'false' }}
         run: |
-          if [ -f test-reports/plugin-summary.md ]; then
+          # Written by test code inside the container: never follow a symlink.
+          if [ -f test-reports/plugin-summary.md ] && [ ! -L test-reports/plugin-summary.md ]; then
             { echo "## Plugin test results"; cat test-reports/plugin-summary.md; } >> "$GITHUB_STEP_SUMMARY"
           fi
 
@@ -707,6 +729,7 @@ jobs:
       - name: Remove this run's CI images
         if: always()
         run: |
-          # Only images this job created; shared daemon, so no system/builder prune.
+          # Only this run's tag and labelled containers: the daemon is shared, so never a
+          # system/builder prune. For plugin repos this only removes the tag.
           docker rmi "$IMAGE_TAG" 2>/dev/null || true
           docker container prune -f --filter label=geoips-ci=true || true
