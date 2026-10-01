@@ -50,6 +50,12 @@ on:
         required: false
       docker_token:
         required: false
+      private_repos_token:
+        description: >
+          Read-only GitHub token for the private plugin repos (private_plugin_repos
+          and private_fortran_repos in geoips' ansible inventory). If set, the core
+          image is built with those plugins and is then never pushed.
+        required: false
 
 # ---------------------------------------------------------------------------
 # Example caller (in geoips or plugin repo):
@@ -293,10 +299,25 @@ jobs:
           DOCKER_BUILD_TARGET: ${{ vars.DOCKER_BUILD_TARGET || 'geoips-site' }}
           EXTRA_PLUGINS: ${{ vars.EXTRA_PLUGINS || '' }}
           PIP_EDITABLE: ${{ inputs.pip_editable }}
+          # Empty for fork pull requests: GitHub does not pass them secrets.
+          PRIVATE_REPOS_TOKEN: ${{ secrets.private_repos_token }}
         run: |
           if ! [[ "$DOCKER_BUILD_TARGET" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
             echo "Invalid DOCKER_BUILD_TARGET: $DOCKER_BUILD_TARGET" >&2
             exit 1
+          fi
+          # Private plugin repos: the token reaches the build only as a BuildKit
+          # secret (never a build argument), so it is in no layer, no image history
+          # and no .git/config (see geoips tests/ansible/scripts/github-token-env.sh).
+          private_args=()
+          if [ -n "$PRIVATE_REPOS_TOKEN" ] && [ "$IS_FORK" != "true" ]; then
+            token_file="${RUNNER_TEMP}/geoips_private_token"
+            trap 'rm -f "$token_file"' EXIT
+            (umask 077 && printf '%s' "$PRIVATE_REPOS_TOKEN" > "$token_file")
+            private_args=(--secret "id=geoips_private_token,src=${token_file}"
+                          --build-arg GEOIPS_USE_PRIVATE_PLUGINS=true)
+            echo "PRIVATE_PLUGINS_IN_IMAGE=true" >> "$GITHUB_ENV"
+            echo "::notice::Building with the private plugin repos; this image will not be pushed."
           fi
           DOCKER_BUILDKIT=1 docker build \
             --cache-from geoips:cache \
@@ -305,6 +326,7 @@ jobs:
             --build-arg EXTRA_PLUGINS="$EXTRA_PLUGINS" \
             --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
             --build-arg PIP_EDITABLE="$PIP_EDITABLE" \
+            "${private_args[@]}" \
             --progress=plain \
             .
 
@@ -620,6 +642,9 @@ jobs:
           CI_LINT: ${{ vars.CI_LINT }}
           CONTINUE_PLUGINS_UNIT_ERROR: ${{ inputs.continue_on_plugins_unit_error }}
           CONTINUE_PLUGINS_INTEG_ERROR: ${{ inputs.continue_on_plugins_integ_error }}
+          # Logs and artifacts of public repositories are public: private plugins'
+          # tests then run without tracebacks, source lines or HTML reports.
+          PRIVATE_PLUGIN_OUTPUT: ${{ (github.event.repository.visibility == 'public' && vars.SHOW_PRIVATE_PLUGIN_OUTPUT != 'true') && 'quiet' || 'full' }}
         run: |
           : "${TESTDATA_PATH:?TESTDATA_PATH is not set: the Set testdata path step did not run}"
           mkdir -p test-reports
@@ -632,6 +657,7 @@ jobs:
             -e CI_LINT \
             -e CONTINUE_PLUGINS_UNIT_ERROR \
             -e CONTINUE_PLUGINS_INTEG_ERROR \
+            -e PRIVATE_PLUGIN_OUTPUT \
             "$IMAGE_TAG" \
             bash -c '
               echo "::group::Scan /packages/"
@@ -644,6 +670,12 @@ jobs:
               skip_count=0
               summary="/workspace/test-reports/plugin-summary.md"
               pip install pytest-html --quiet
+              # Written by the image build when it included private plugin repos.
+              private_plugins=" $(tr "\n" " " < /packages/.private_plugins 2>/dev/null) "
+              quiet=false
+              out_args="-vv --tb=short"
+              # html_args <report file>: HTML report options, none for quiet plugins
+              html_args() { [ "$quiet" = true ] || echo "--html=/workspace/test-reports/$1 --self-contained-html"; }
               echo "| Plugin | Suite | Result |" > "$summary"
               echo "|---|---|---|" >> "$summary"
 
@@ -651,7 +683,7 @@ jobs:
               run_suite() {
                 local name="$1" suite="$2" ignore="$3"; shift 3
                 echo "::group::$name/$suite"
-                if pytest -vv --tb=short "$@"; then
+                if pytest $out_args "$@"; then
                   echo "$name/$suite: PASSED"
                   echo "| $name | $suite | PASSED |" >> "$summary"
                 elif [ "$ignore" = "true" ]; then
@@ -670,6 +702,14 @@ jobs:
                 name=$(basename "$pkg_dir")
                 [ "$name" = "geoips" ] && continue
                 cd "$pkg_dir"
+                quiet=false; out_args="-vv --tb=short"
+                case "$private_plugins" in
+                  *" $name "*)
+                    if [ "$PRIVATE_PLUGIN_OUTPUT" = "quiet" ]; then
+                      quiet=true; out_args="-qq --tb=no -rN"
+                      echo "$name is a private plugin: only results are shown in this public repository (SHOW_PRIVATE_PLUGIN_OUTPUT=true shows everything)"
+                    fi ;;
+                esac
                 # Lint every plugin (it only reads the files, no install needed).
                 if [ "$CI_LINT" != "false" ] && [ "$CI_DEBUG_FAST" != "true" ]; then
                   run_suite "$name" lint "$CONTINUE_PLUGINS_UNIT_ERROR" -m "lint and not doc8" \
@@ -693,23 +733,23 @@ jobs:
                 if [ "$CI_DEBUG_FAST" != "true" ]; then
                   if [ "$has_unit" = true ]; then
                     run_suite "$name" unit "$CONTINUE_PLUGINS_UNIT_ERROR" tests/unit_tests \
-                      --html="/workspace/test-reports/$name-unit-tests.html" --self-contained-html
+                      $(html_args "$name-unit-tests.html")
                   fi
                   if [ "$has_unit_long" = true ]; then
                     run_suite "$name" unit-long "$CONTINUE_PLUGINS_UNIT_ERROR" tests/unit_tests_long \
-                      --html="/workspace/test-reports/$name-unit-tests-long.html" --self-contained-html
+                      $(html_args "$name-unit-tests-long.html")
                   fi
                 fi
                 if [ "$has_integ" = true ]; then
                   run_suite "$name" integration-base "$CONTINUE_PLUGINS_INTEG_ERROR" -m "base and integration" \
                     tests/integration_tests/test_*.py --no-fail-on-missing-data \
-                    --html="/workspace/test-reports/$name-integration-base.html" --self-contained-html
+                    $(html_args "$name-integration-base.html")
                   if [ "$CI_DEBUG_FAST" = "true" ]; then
                     echo "$name/integration-full: SKIPPED (CI_DEBUG_FAST)"
                   else
                     run_suite "$name" integration-full "$CONTINUE_PLUGINS_INTEG_ERROR" -m "full and integration" \
                       tests/integration_tests/test_*.py --no-fail-on-missing-data \
-                      --html="/workspace/test-reports/$name-integration-full.html" --self-contained-html
+                      $(html_args "$name-integration-full.html")
                   fi
                 fi
               done
@@ -768,7 +808,9 @@ jobs:
       # -------------------------------------------------------------------
 
       - name: Push image to registry
-        if: ${{ vars.ENABLE_DOCKER_REGISTRY == 'true' && env.IS_PLUGIN != 'true' && env.IS_FORK != 'true' }}
+        # An image with private plugins is only pushed if the registry is known to be
+        # private: set ALLOW_PRIVATE_IMAGE_PUSH=true.
+        if: ${{ vars.ENABLE_DOCKER_REGISTRY == 'true' && env.IS_PLUGIN != 'true' && env.IS_FORK != 'true' && (env.PRIVATE_PLUGINS_IN_IMAGE != 'true' || vars.ALLOW_PRIVATE_IMAGE_PUSH == 'true') }}
         env:
           DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
           DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
@@ -783,7 +825,8 @@ jobs:
           docker push "$REMOTE_TAG"
 
       - name: Push dev image to GHCR (core only, on merge to main)
-        if: ${{ env.IS_PLUGIN != 'true' && env.IS_FORK != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        # Never with private plugins: plugin repos pull this image (it must stay public).
+        if: ${{ env.IS_PLUGIN != 'true' && env.IS_FORK != 'true' && env.PRIVATE_PLUGINS_IN_IMAGE != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}

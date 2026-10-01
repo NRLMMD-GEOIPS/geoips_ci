@@ -1,0 +1,29 @@
+continuous integration:
+- title: 'Build the core CI image with private plugins from a read-only token'
+  description: |
+    ``reusable-ci.yaml`` accepts a new optional secret ``private_repos_token``: a
+    GitHub token that can read the private plugin repositories in geoips' ansible
+    inventory. If it is set (never for pull requests from forks, which get no
+    secrets), the core image is built with those plugins.
+
+    * The token is passed to ``docker build`` only as the BuildKit secret
+      ``geoips_private_token``, from a ``0600`` file in ``RUNNER_TEMP`` that is
+      deleted right after the build. It is never a build argument.
+    * An image with private plugins is never pushed to the GHCR ``latest`` image,
+      and to ``DOCKER_REGISTRY`` only with ``ALLOW_PRIVATE_IMAGE_PUSH=true``.
+    * In public repositories, whose logs and artifacts are public, private
+      plugins' tests run with ``-qq --tb=no -rN`` and without HTML reports, so only
+      results are shown. ``SHOW_PRIVATE_PLUGIN_OUTPUT=true`` shows everything.
+
+    The README section "Private plugin repositories" describes the token setup and
+    what remains visible.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+    - 'README.md'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-01
+    finish: 2026-10-01

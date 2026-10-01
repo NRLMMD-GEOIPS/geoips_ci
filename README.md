@@ -102,6 +102,45 @@ Things to know:
   ``needs.fork-gate.outputs.allowed == 'true'`` in its own ``if``. Jobs that use
   ``always()`` or ``!cancelled()`` would otherwise still run when the gate denied the run.
 
+Private plugin repositories
+---------------------------
+
+The core image can include the private plugins listed in ``private_plugin_repos`` and
+``private_fortran_repos`` (``tests/ansible/inventory/local.yml`` in ``geoips``). Cloning them
+needs a token that can read those repositories; the workflow's own ``GITHUB_TOKEN`` cannot.
+
+One-time setup:
+
+1. Create a fine-grained personal access token, preferably for a machine or bot account:
+   resource owner ``NRLMMD-GEOIPS``, repository access limited to those private
+   repositories, permission "Contents: Read-only", and an expiry date (the organization
+   may have to approve it). Every repository in both lists must be readable by it, or the
+   image build fails; remove repositories from the lists that CI should not build.
+2. Store it as the secret ``GEOIPS_PRIVATE_REPOS_TOKEN`` of the ``geoips`` repository (or as
+   an organization secret available to it). ``geoips``' ``integ_test.yaml`` passes it to
+   ``reusable-ci.yaml`` as ``private_repos_token``.
+
+How it is protected:
+
+* The token reaches the Docker build only as the BuildKit secret ``geoips_private_token``,
+  and git reads it from environment variables during the plugin install step, so it is
+  never stored in an image layer, the image history or a cloned repository's ``.git/config``.
+* Pull requests from forks never get it (GitHub does not pass secrets to them); their image
+  has the public plugins only.
+* An image with private plugins is never pushed to ``ghcr.io/nrlmmd-geoips/geoips:latest``,
+  and to ``DOCKER_REGISTRY`` only if ``ALLOW_PRIVATE_IMAGE_PUSH`` is ``true``.
+* ``geoips`` is public, so its Actions logs and artifacts are public. There, private
+  plugins' tests run with ``-qq --tb=no -rN`` and without HTML reports, so only pass/fail is
+  shown. Set the ``SHOW_PRIVATE_PLUGIN_OUTPUT`` variable to ``true`` to see everything (only
+  if those logs may show the code). In private repositories everything is shown.
+
+Still visible in a public repository: the private repositories' names, their test results,
+and the image build log (clone and install messages, including any compiler warnings that
+quote source lines of the private Fortran repositories). The plugin repositories' own
+install scripts run in the same build step and can read the token, so use a token that can
+only read these repositories. On the runner host, the image (until the end of the run) and
+BuildKit's cache contain the private code, and anyone with Docker access there can read it.
+
 Self-hosted runner maintenance
 ------------------------------
 
