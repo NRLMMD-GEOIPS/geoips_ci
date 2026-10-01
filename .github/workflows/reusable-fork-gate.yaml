@@ -77,8 +77,8 @@ jobs:
     # An empty name would mean "no environment" and therefore no hold.
     environment: ${{ inputs.environment || 'fork-approval' }}
     steps:
-      - name: Fork run approved by a required reviewer
-        run: echo "A required reviewer approved running this fork pull request on the self-hosted runner."
+      - name: Run approved by a required reviewer
+        run: echo "A required reviewer approved running this fork pull request (or other untrusted event) on the self-hosted runner."
 
   result:
     needs: approval
@@ -105,7 +105,7 @@ jobs:
           esac
           echo "is_fork=${is_fork}" >> "$GITHUB_OUTPUT"
           echo "allowed=${allowed}" >> "$GITHUB_OUTPUT"
-          echo "Fork pull request: ${is_fork}; self-hosted allowed: ${allowed} (approval: ${APPROVAL_RESULT})"
+          echo "Needed approval: ${is_fork}; self-hosted allowed: ${allowed} (approval job: ${APPROVAL_RESULT})"
           if [ "$allowed" != "true" ]; then
-            echo "::warning::Fork pull request was not approved; self-hosted jobs will be skipped."
+            echo "::warning::This run (fork pull request or other untrusted event) was not approved; self-hosted jobs will be skipped."
           fi

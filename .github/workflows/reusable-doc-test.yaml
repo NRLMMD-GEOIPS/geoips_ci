@@ -191,6 +191,12 @@ jobs:
           name: HTML Docs
           path: ${{ steps.build-html-docs.outputs.BUILT_DOCS_PATH }}
           if-no-files-found: error
+      - name: Remove fork workspace
+        # Fork code ran in this job with the workspace mounted: leave nothing (git
+        # hooks, .git/config, untracked files) for later jobs of this repository.
+        if: ${{ always() && needs.fork-gate.outputs.is_fork == 'true' }}
+        # ${GITHUB_WORKSPACE:?} aborts instead of expanding to "/*" if it were ever empty.
+        run: rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.[!.]* "${GITHUB_WORKSPACE:?}"/..?* || true
 
   #################################################
   # Code tests - requires pip installed geoips, so use container
@@ -228,6 +234,12 @@ jobs:
             echo "::error::due to interface violations ${ret##*:}"
             exit 1
           fi
+      - name: Remove fork workspace
+        # Fork code ran in this job with the workspace mounted: leave nothing (git
+        # hooks, .git/config, untracked files) for later jobs of this repository.
+        if: ${{ always() && needs.fork-gate.outputs.is_fork == 'true' }}
+        # ${GITHUB_WORKSPACE:?} aborts instead of expanding to "/*" if it were ever empty.
+        run: rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.[!.]* "${GITHUB_WORKSPACE:?}"/..?* || true
 
   docker_test_pytest_short:
     if: >
@@ -288,3 +300,9 @@ jobs:
             echo "::error::due to geoips repo pytest errors, return code ${ret}"
             exit 1
           fi
+      - name: Remove fork workspace
+        # Fork code ran in this job with the workspace mounted: leave nothing (git
+        # hooks, .git/config, untracked files) for later jobs of this repository.
+        if: ${{ always() && needs.fork-gate.outputs.is_fork == 'true' }}
+        # ${GITHUB_WORKSPACE:?} aborts instead of expanding to "/*" if it were ever empty.
+        run: rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.[!.]* "${GITHUB_WORKSPACE:?}"/..?* || true

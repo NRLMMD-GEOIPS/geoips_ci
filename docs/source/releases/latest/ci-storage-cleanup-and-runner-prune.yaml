@@ -3,8 +3,8 @@ continuous integration:
   description: |
     The self-hosted runner shares its Docker daemon with other users, so all
     cleanup is limited to material created by this CI. Nothing runs
-    ``docker system prune``, ``docker builder prune`` or removes dangling or
-    third-party images.
+    ``docker system prune`` or ``docker builder prune``, and images that are
+    tagged by anyone else or used by a container are never removed.
 
     * Every container started by ``reusable-ci.yaml`` is labelled
       ``geoips-ci=true`` and with a per-run label. Images are not labelled,
@@ -29,13 +29,23 @@ continuous integration:
       (``PRUNE_DANGLING_GEOIPS_IMAGES=true``) and, weekly, stale test data
       (``CLEAN_STALE_TESTDATA=true``). It skips the run while a CI container is
       running, never removes images that are in use, and never deletes anything
-      in ``/tmp``.
+      in ``/tmp``. ``scripts/test-runner-prune.sh`` tests these rules against a
+      fake ``docker``; the new ``check-ci-scripts.yaml`` runs it and
+      ``shellcheck`` on pull requests, and fails if a reusable workflow
+      reference does not point at ``@main``.
+    * The GHCR build cache was never used: its image had no inline cache
+      metadata, and the pull failed anyway (see the GHCR name fix). The ``deps``
+      image is now built with ``BUILDKIT_INLINE_CACHE=1`` and the registry copy
+      is passed directly as ``--cache-from``, so BuildKit fetches only the layers
+      it reuses instead of pulling the whole image every run.
   files:
     modified:
     - '.github/workflows/reusable-ci.yaml'
     added:
     - '.github/workflows/scheduled-runner-prune.yaml'
+    - '.github/workflows/check-ci-scripts.yaml'
     - 'scripts/runner-prune.sh'
+    - 'scripts/test-runner-prune.sh'
   related-issue:
     number: null
     repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'

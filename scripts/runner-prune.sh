@@ -48,6 +48,7 @@ CLEAN_STALE_TESTDATA="${CLEAN_STALE_TESTDATA:-false}"
 CI_IMAGE_REPO="${CI_IMAGE_REPO:-ghcr.io/nrlmmd-geoips/geoips}"
 PRUNE_DANGLING_GEOIPS_IMAGES="${PRUNE_DANGLING_GEOIPS_IMAGES:-false}"
 CI_ORPHAN_HOURS="${CI_ORPHAN_HOURS:-6}"
+case "$CI_ORPHAN_HOURS" in ''|*[!0-9]*) echo "CI_ORPHAN_HOURS must be a number of hours" >&2; exit 2 ;; esac
 # Tags reusable-ci.yaml creates; anything else under geoips:dev-* may be a person's.
 CI_TAG_RE='^geoips:dev-[0-9a-f]{40}(-[0-9]+-[0-9]+)?$'
 # Only images older than this are removed. Nightly keeps two days of history.

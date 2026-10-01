@@ -26,7 +26,8 @@ continuous integration:
       request needs approval again.
     * Approved fork runs of ``reusable-ci.yaml`` use a clean checkout, never push
       the build cache, registry image or ``latest`` image, and empty the workspace
-      (including ``.git``) when they finish. The checkout no longer stores the job
+      (including ``.git``) when they finish, as do the ``reusable-doc-test.yaml``
+      container jobs. The checkout no longer stores the job
       token in ``.git/config``, which the Docker build copied into the image.
     * Fork pull requests have no registry credentials, so ``docker_token`` is no
       longer a required secret of ``reusable-doc-test.yaml`` and

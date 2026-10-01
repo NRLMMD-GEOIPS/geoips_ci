@@ -92,8 +92,9 @@ Things to know:
   ``doclinttest-latest`` image, as plugin repositories do.
 * Approving a fork run means running its code on the self-hosted runner (as root inside
   containers, with the workspace and test data mounted). Review it as you would before
-  merging. ``reusable-ci`` empties the workspace (including ``.git``) after a fork run, and
-  before the next run if that cleanup did not happen.
+  merging. ``reusable-ci`` and the ``reusable-doc-test`` container jobs empty the workspace
+  (including ``.git``) after a fork run; ``reusable-ci`` also does so before the next run if
+  that cleanup did not happen.
 * A denied run shows its self-hosted jobs as skipped. Require the whole workflow (as the
   organization ruleset required workflows do), not only individual job names, in branch
   protection, since GitHub counts a skipped job as passed.
@@ -128,12 +129,20 @@ deleted. ``docker system prune`` and ``docker builder prune`` are never run.
   unless a container uses it.
 * ``scheduled-runner-prune.yaml`` runs ``scripts/runner-prune.sh`` nightly and weekly
   (manual runs default to ``--dry-run``). The runner must be available to ``geoips_ci``,
-  and GitHub disables schedules in public repositories after 60 days without activity. The
-  script can also be run from host cron or a systemd timer:
+  and the job prunes only the host whose runner picks it up; GitHub also disables schedules
+  in public repositories after 60 days without activity. With several runner hosts, or to
+  avoid both limits, run the script from cron or a systemd timer on each host:
   ``scripts/runner-prune.sh --nightly|--weekly [--dry-run]``.
+* ``scripts/test-runner-prune.sh`` checks the script's safety rules against a fake
+  ``docker`` (run it after any change; ``check-ci-scripts.yaml`` runs it with
+  ``shellcheck`` on every pull request, and also fails if a reusable workflow reference does
+  not point at ``@main``).
 * Test data defaults to ``~/.geoips-testdata`` (before: ``/tmp/geoips_outdirs``). Set the
   ``TESTDATA_PATH`` variable to put it on a large data volume. The old ``/tmp`` directory is
   not deleted automatically, since another repository may still use it; CI warns while it
   exists. Delete it once no CI uses it.
+* The ``deps`` image is built with inline cache metadata and the copy pushed to
+  ``ghcr.io/nrlmmd-geoips/geoips:build-cache-<arch>`` is used directly as a cache source, so
+  BuildKit fetches only the layers it reuses instead of pulling the whole image every run.
 * BuildKit build cache is not pruned, Docker cannot limit that to one project. If it grows
   too large, give the CI its own ``docker buildx`` builder and prune only that builder.

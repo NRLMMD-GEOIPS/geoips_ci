@@ -245,48 +245,46 @@ jobs:
           restore-keys: |
             pytest-cache-${{ github.ref }}-
 
-      - name: Pull build cache (deps layers from previous run)
+      - name: Log in to GHCR (build cache)
         if: ${{ env.IS_PLUGIN != 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_ACTOR: ${{ github.actor }}
-          GH_REPOSITORY: ${{ github.repository }}
         run: |
-          # Image references must be lowercase, but github.repository keeps the
-          # owner's case (NRLMMD-GEOIPS/geoips), which Docker rejects.
-          remote="ghcr.io/${GH_REPOSITORY,,}:build-cache-$(uname -m)"
-          # Remember the current local cache image so the next step can remove it once
-          # it has been replaced: an untagged image cannot be identified as ours later.
-          printf 'OLD_CACHE_ID=%s\n' "$(docker image inspect -f '{{.Id}}' geoips:cache 2>/dev/null || true)" >> "$GITHUB_ENV"
-          old_remote_id=$(docker image inspect -f '{{.Id}}' "$remote" 2>/dev/null || true)
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
-          docker pull "$remote" || true
-          docker tag "$remote" geoips:cache 2>/dev/null || true
-          # A newer pull leaves the previously pulled cache image untagged: remove it
-          # unless a container uses it (no -f).
-          if [ -n "$old_remote_id" ] && [ "$(docker image inspect -f '{{len .RepoTags}}' "$old_remote_id" 2>/dev/null)" = "0" ]; then
-            docker rmi "$old_remote_id" 2>/dev/null || true
-          fi
 
       - name: Build deps cache layer
         if: ${{ env.IS_PLUGIN != 'true' }}
         env:
           EXTRA_PLUGINS: ${{ vars.EXTRA_PLUGINS || '' }}
+          GH_REPOSITORY: ${{ github.repository }}
         run: |
+          # Image references must be lowercase, but github.repository keeps the
+          # owner's case (NRLMMD-GEOIPS/geoips), which Docker rejects.
+          remote="ghcr.io/${GH_REPOSITORY,,}:build-cache-$(uname -m)"
+          old_id=$(docker image inspect -f '{{.Id}}' geoips:cache 2>/dev/null || true)
+          # Cache sources: BuildKit's own cache on this runner, the local geoips:cache,
+          # and the copy pushed to GHCR. BUILDKIT_INLINE_CACHE writes the cache
+          # metadata into the image, without which an image cannot serve as
+          # --cache-from; BuildKit then fetches only the layers it reuses, so the
+          # registry image is never pulled as a whole. Missing sources only warn.
           DOCKER_BUILDKIT=1 docker build \
             --cache-from geoips:cache \
+            --cache-from "$remote" \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
             --target deps \
             --tag geoips:cache \
             --build-arg EXTRA_PLUGINS="$EXTRA_PLUGINS" \
             --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
             --progress=plain \
             .
-          # Remove the previous cache image if this build left it untagged. docker rmi
-          # without -f keeps it if a container uses it.
+          # Remove the previous cache image if this build left it untagged: it cannot
+          # be identified as ours later. docker rmi without -f keeps it if a container
+          # uses it.
           new_id=$(docker image inspect -f '{{.Id}}' geoips:cache 2>/dev/null || true)
-          if [ -n "${OLD_CACHE_ID}" ] && [ "${OLD_CACHE_ID}" != "${new_id}" ] \
-              && [ "$(docker image inspect -f '{{len .RepoTags}}' "${OLD_CACHE_ID}" 2>/dev/null)" = "0" ]; then
-            docker rmi "${OLD_CACHE_ID}" 2>/dev/null || true
+          if [ -n "${old_id}" ] && [ "${old_id}" != "${new_id}" ] \
+              && [ "$(docker image inspect -f '{{len .RepoTags}}' "${old_id}" 2>/dev/null)" = "0" ]; then
+            docker rmi "${old_id}" 2>/dev/null || true
           fi
 
       - name: Build target image
@@ -315,7 +313,7 @@ jobs:
         env:
           GH_REPOSITORY: ${{ github.repository }}
         run: |
-          # Lowercase: see "Pull build cache".
+          # Lowercase: see "Build deps cache layer".
           remote="ghcr.io/${GH_REPOSITORY,,}:build-cache-$(uname -m)"
           old_id=$(docker image inspect -f '{{.Id}}' "$remote" 2>/dev/null || true)
           docker tag geoips:cache "$remote"
@@ -638,6 +636,7 @@ jobs:
               found_count=0
               skip_count=0
               summary="/workspace/test-reports/plugin-summary.md"
+              pip install pytest-html --quiet
               echo "| Plugin | Suite | Result |" > "$summary"
               echo "|---|---|---|" >> "$summary"
 
@@ -681,7 +680,6 @@ jobs:
                 found_count=$((found_count + 1))
                 echo "::group::Install $name"
                 pip install -e ".[test]" --quiet || pip install -e . --quiet
-                pip install pytest-html --quiet
                 create_plugin_registries
                 echo "::endgroup::"
 
@@ -801,6 +799,16 @@ jobs:
       # Cleanup
       # -------------------------------------------------------------------
 
+      - name: Stop this run's containers
+        if: always()
+        run: |
+          # A cancelled or timed-out step kills the docker client, not the container.
+          # Stop this run's containers first so nothing still writes to the workspace
+          # while it is chowned and cached below.
+          for c in $(docker ps -aq --filter "label=${CI_RUN_LABEL}"); do
+            docker rm -f "$c" || true
+          done
+
       - name: Fix workspace permissions for next run
         if: always()
         run: |
@@ -822,12 +830,8 @@ jobs:
       - name: Remove this run's CI images
         if: always()
         run: |
-          # Only this run's tag and labelled containers: the daemon is shared, so never a
-          # system/builder prune. For plugin repos this only removes the tag.
-          # Containers of this run that outlived a cancelled or timed-out step.
-          for c in $(docker ps -aq --filter "label=${CI_RUN_LABEL}"); do
-            docker rm -f "$c" || true
-          done
+          # Only this run's tag and stopped labelled containers: the daemon is shared,
+          # so never a system/builder prune. For plugin repos this only removes the tag.
           docker rmi "$IMAGE_TAG" 2>/dev/null || true
           docker container prune -f --filter label=geoips-ci=true || true
 
