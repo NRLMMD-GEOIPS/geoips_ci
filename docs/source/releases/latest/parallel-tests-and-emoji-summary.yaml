@@ -54,3 +54,23 @@ continuous integration bug fixes:
   date:
     start: 2026-10-01
     finish: 2026-10-01
+- title: 'Enough /dev/shm and disk space for parallel tests'
+  description: |
+    With 16 pytest-xdist workers, multiprocessing in the integration tests filled
+    Docker's default 64MB ``/dev/shm`` (``OSError: [Errno 28] No space left on
+    device`` from ``SemLock``). The test containers now get ``--shm-size``
+    ``CI_SHM_SIZE`` (default ``16g``; 16 workers used up to 8.6GB).
+
+    Test outputs in ``$RUNNER_TEMP/geoips-outdirs`` are also removed at the start
+    of a run if an earlier run left them, and a run fails before testing if less
+    than ``CI_MIN_FREE_OUTPUT_GB`` (default 150) is free there.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+    - 'README.md'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-01
+    finish: 2026-10-01

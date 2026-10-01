@@ -155,6 +155,19 @@ Under xdist, each worker writes its outputs to its own ``$GEOIPS_OUTDIRS/xdist/<
 write the same output files. A test that still cannot run next to the others can be kept on
 one worker with ``@pytest.mark.xdist_group("serial")``.
 
+Space used by parallel tests:
+
+* ``/dev/shm``: multiprocessing in the tests (for example the AMSR2 runs) keeps shared
+  memory arenas and semaphores there. Docker's default of 64MB fails with
+  ``OSError: [Errno 28] No space left on device``; 16 workers used up to 8.6GB. The test
+  containers get ``--shm-size`` ``CI_SHM_SIZE`` (default ``16g``), which takes RAM only
+  as it is used.
+* Disk: test outputs go to ``$RUNNER_TEMP/geoips-outdirs`` on the runner (about 100GB for
+  geoips and all plugins, since each worker builds its own geolocation cache) and are
+  removed at the end of the run, or at the start of the next run if that did not happen.
+  A run fails before testing if less than ``CI_MIN_FREE_OUTPUT_GB`` (default 150) is free
+  there.
+
 At the end of the run, the "Test summary" step lists every repository (geoips first, then
 each plugin) with ✅ passed, ❌ failed, ⚠️ failed but ignored (``continue_on_*`` inputs)
 or ➖ no tests, in the log and in the job summary.

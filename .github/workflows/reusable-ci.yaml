@@ -97,6 +97,9 @@ on:
 #   CI_MIN_FREE_GB      — free disk space (GB) below which stale CI images are removed (default: 40)
 #   CI_PYTEST_WORKERS   — pytest-xdist workers for unit and integration tests (default: 16,
 #                         0 or 1 runs them serially)
+#   CI_SHM_SIZE         — /dev/shm size of the test containers (default: 16g)
+#   CI_MIN_FREE_OUTPUT_GB — free space (GB) needed for test outputs in RUNNER_TEMP, or the
+#                         run fails before testing (default: 150)
 #
 # FORK PULL REQUESTS:
 #   For pull_request events whose head repo differs from this repo, the CI job
@@ -171,10 +174,19 @@ jobs:
               alpine:latest \
               sh -c "chown -R $(id -u):$(id -g) /workspace" || true
           fi
+          # Test outputs of a run whose "Remove test outputs" step did not run (for
+          # example, the runner died). Written as root, so removed from a container.
+          if [ -d "${RUNNER_TEMP}/geoips-outdirs" ]; then
+            docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
+              -v "${RUNNER_TEMP}":/runner_temp alpine:latest \
+              rm -rf /runner_temp/geoips-outdirs || true
+          fi
 
       - name: Clear old reports and check disk space
         env:
           MIN_FREE_GB: ${{ vars.CI_MIN_FREE_GB || '40' }}
+          MIN_FREE_OUTPUT_GB: ${{ vars.CI_MIN_FREE_OUTPUT_GB || '150' }}
+          CI_INTEGRATION: ${{ vars.CI_INTEGRATION }}
         run: |
           rm -rf test-reports .coverage* 2>/dev/null || true
           # Lowest free space (GB) of the filesystems we can read: the Docker root
@@ -216,6 +228,17 @@ jobs:
             { echo "### Low disk space"; echo "Free was ${free_gb}GB; removed stale geoips:dev-* CI images older than 24h."; } >> "$GITHUB_STEP_SUMMARY"
           fi
           docker system df || true
+          # Test outputs (each pytest-xdist worker with its own geolocation cache) go to
+          # RUNNER_TEMP, about 100GB for geoips and all plugins: stop now rather than
+          # fail tests halfway with a full disk.
+          if [ "${CI_INTEGRATION}" != "false" ]; then
+            out_gb=$(df -P -BG "${RUNNER_TEMP}" | awk 'NR==2{gsub("G","",$4); print $4}')
+            echo "Free space for test outputs (${RUNNER_TEMP}): ${out_gb}GB (minimum ${MIN_FREE_OUTPUT_GB}GB)"
+            if [ "${out_gb}" -lt "${MIN_FREE_OUTPUT_GB}" ]; then
+              echo "::error::Only ${out_gb}GB free for test outputs in ${RUNNER_TEMP}, ${MIN_FREE_OUTPUT_GB}GB needed (CI_MIN_FREE_OUTPUT_GB)"
+              exit 1
+            fi
+          fi
 
       - uses: actions/checkout@v4
         with:
@@ -245,9 +268,10 @@ jobs:
           echo "PACKAGE_NAME=${PACKAGE_NAME}" >> "$GITHUB_ENV"
           echo "Detected package: ${PACKAGE_NAME}"
 
-      - name: Set pytest-xdist workers
+      - name: Set pytest-xdist workers and /dev/shm size
         env:
           PYTEST_WORKERS: ${{ vars.CI_PYTEST_WORKERS || '16' }}
+          SHM_SIZE: ${{ vars.CI_SHM_SIZE || '16g' }}
         run: |
           case "$PYTEST_WORKERS" in
             ''|*[!0-9]*)
@@ -255,6 +279,14 @@ jobs:
               exit 1
               ;;
           esac
+          # Multiprocessing in the tests (shared memory arenas, semaphores) uses
+          # /dev/shm, 64MB by default in Docker: 16 workers reached 8.6GB. Only the
+          # memory actually used is taken from RAM.
+          if ! [[ "$SHM_SIZE" =~ ^[0-9]+[bkmg]?$ ]]; then
+            echo "::error::CI_SHM_SIZE must be a size like 16g"
+            exit 1
+          fi
+          echo "SHM_SIZE=${SHM_SIZE}" >> "$GITHUB_ENV"
           # Passed to the unit and integration test pytest calls (not lint). Each
           # plugin's tests run in parallel; the plugins themselves run one by one.
           if [ "$PYTEST_WORKERS" -gt 1 ]; then
@@ -404,6 +436,7 @@ jobs:
           PACKAGE_NAME_ENV: ${{ env.PACKAGE_NAME }}
         run: |
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
+            --shm-size "$SHM_SIZE" \
             --user root \
             -v "$(pwd)":/workspace -w /workspace \
             -e CI_LINT -e CI_DEBUG_FAST -e PACKAGE_NAME_ENV -e CURR_REPO -e XDIST_ARGS \
@@ -448,6 +481,7 @@ jobs:
         continue-on-error: ${{ inputs.continue_on_plugins_unit_error }}
         run: |
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
+            --shm-size "$SHM_SIZE" \
             --user root \
             -v "$(pwd)":/workspace -w /workspace \
             -e XDIST_ARGS \
@@ -623,6 +657,7 @@ jobs:
           outdirs="${RUNNER_TEMP}/geoips-outdirs/core"
           mkdir -p "$outdirs" && chmod a+rwx "$outdirs"
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
+            --shm-size "$SHM_SIZE" \
             --user "$DOCKER_USER" \
             -v "${TESTDATA_PATH}":/geoips_testdata \
             -v "$outdirs":/output \
@@ -692,6 +727,7 @@ jobs:
           outdirs="${RUNNER_TEMP}/geoips-outdirs/plugins"
           mkdir -p "$outdirs" && chmod a+rwx "$outdirs"
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
+            --shm-size "$SHM_SIZE" \
             --user "${CI_DOCKER_USER:-root}" \
             -v "${TESTDATA_PATH}":/geoips_testdata \
             -v "$outdirs":/output \
