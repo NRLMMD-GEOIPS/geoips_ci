@@ -141,6 +141,24 @@ install scripts run in the same build step and can read the token, so use a toke
 only read these repositories. On the runner host, the image (until the end of the run) and
 BuildKit's cache contain the private code, and anyone with Docker access there can read it.
 
+Parallel tests (pytest-xdist)
+-----------------------------
+
+``reusable-ci.yaml`` runs the unit and integration tests of geoips and of each plugin with
+``pytest -n 16 --dist worksteal``. Lint is not parallel, and the plugins are still tested
+one after another. Set the ``CI_PYTEST_WORKERS`` variable to change the number of workers
+(``0`` or ``1`` runs everything serially). Running ``pytest`` yourself stays serial unless
+you pass ``-n``.
+
+Under xdist, each worker writes its outputs to its own ``$GEOIPS_OUTDIRS/xdist/<worker>``
+(see ``tests/integration_tests/test_integration.py`` in ``geoips``), since several tests
+write the same output files. A test that still cannot run next to the others can be kept on
+one worker with ``@pytest.mark.xdist_group("serial")``.
+
+At the end of the run, the "Test summary" step lists every repository (geoips first, then
+each plugin) with ✅ passed, ❌ failed, ⚠️ failed but ignored (``continue_on_*`` inputs)
+or ➖ no tests, in the log and in the job summary.
+
 Self-hosted runner maintenance
 ------------------------------
 

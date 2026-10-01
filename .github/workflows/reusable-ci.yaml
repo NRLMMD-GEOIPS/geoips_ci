@@ -95,6 +95,8 @@ on:
 #   DOCKER_REGISTRY_USER — registry username
 #   CLEAN_STALE_TESTDATA — set to "true" to auto-delete test data dirs >30 days old
 #   CI_MIN_FREE_GB      — free disk space (GB) below which stale CI images are removed (default: 40)
+#   CI_PYTEST_WORKERS   — pytest-xdist workers for unit and integration tests (default: 16,
+#                         0 or 1 runs them serially)
 #
 # FORK PULL REQUESTS:
 #   For pull_request events whose head repo differs from this repo, the CI job
@@ -243,6 +245,24 @@ jobs:
           echo "PACKAGE_NAME=${PACKAGE_NAME}" >> "$GITHUB_ENV"
           echo "Detected package: ${PACKAGE_NAME}"
 
+      - name: Set pytest-xdist workers
+        env:
+          PYTEST_WORKERS: ${{ vars.CI_PYTEST_WORKERS || '16' }}
+        run: |
+          case "$PYTEST_WORKERS" in
+            ''|*[!0-9]*)
+              echo "::error::CI_PYTEST_WORKERS must be a whole number"
+              exit 1
+              ;;
+          esac
+          # Passed to the unit and integration test pytest calls (not lint). Each
+          # plugin's tests run in parallel; the plugins themselves run one by one.
+          if [ "$PYTEST_WORKERS" -gt 1 ]; then
+            echo "XDIST_ARGS=-n ${PYTEST_WORKERS} --dist worksteal" >> "$GITHUB_ENV"
+          else
+            echo "XDIST_ARGS=" >> "$GITHUB_ENV"
+          fi
+
       - name: Restore pytest cache
         uses: actions/cache/restore@v4
         with:
@@ -383,63 +403,67 @@ jobs:
           CI_LINT: ${{ vars.CI_LINT }}
           PACKAGE_NAME_ENV: ${{ env.PACKAGE_NAME }}
         run: |
-          if [ "$CI_LINT" = "false" ]; then
-            echo "Lint disabled via CI_LINT=false"
-            LINT_CMD="echo Lint skipped"
-          else
-            LINT_CMD="pytest -vv --tb=short -m 'lint and not doc8' /packages/geoips/tests/lint/ --lint-path /workspace"
-          fi
-
-          if [ "$CI_DEBUG_FAST" = "true" ]; then
-            UNIT_CMD="echo 'Unit tests skipped (CI_DEBUG_FAST)'"
-            UPLOAD_UNIT=false
-          elif [ ! -d "tests/unit_tests" ]; then
-            UNIT_CMD="echo 'No unit tests found, skipping'"
-            UPLOAD_UNIT=false
-          else
-            UNIT_CMD="pytest -vv tests/unit_tests \
-              --html=/workspace/test-reports/unit-tests.html \
-              --self-contained-html \
-              --cov=\"$PACKAGE_NAME_ENV\" \
-              --cov-report=html:/workspace/test-reports/coverage-unit"
-            UPLOAD_UNIT=true
-          fi
-
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
             --user root \
             -v "$(pwd)":/workspace -w /workspace \
+            -e CI_LINT -e CI_DEBUG_FAST -e PACKAGE_NAME_ENV -e CURR_REPO -e XDIST_ARGS \
             "$IMAGE_TAG" \
-            bash -c "
+            bash -c '
               git config --global --add safe.directory /workspace
-              pip install -e '.[test,lint]' pytest-html
+              pip install -e ".[test,lint]" pytest-html pytest-xdist
               create_plugin_registries
-              echo '::group::Lint'
-              ${LINT_CMD}
-              echo '::endgroup::'
-              echo '---'
-              echo '::group::Unit tests'
-              ${UNIT_CMD}
-              echo '::endgroup::'
-            "
-
-          echo "UPLOAD_UNIT=${UPLOAD_UNIT:-false}" >> "$GITHUB_ENV"
+              mkdir -p /workspace/test-reports
+              rc=0
+              # run_suite <suite> <pytest args...>: records the result for the test
+              # summary, and makes this step fail if any suite failed.
+              run_suite() {
+                local suite="$1" result=PASSED; shift
+                echo "::group::$suite"
+                pytest "$@" || { result=FAILED; rc=1; }
+                echo "| $CURR_REPO | $suite | $result |" >> /workspace/test-reports/core-summary.md
+                echo "::endgroup::"
+              }
+              if [ "$CI_LINT" = "false" ]; then
+                echo "Lint disabled via CI_LINT=false"
+              else
+                run_suite lint -vv --tb=short -m "lint and not doc8" \
+                  /packages/geoips/tests/lint/ --lint-path /workspace
+              fi
+              if [ "$CI_DEBUG_FAST" = "true" ]; then
+                echo "Unit tests skipped (CI_DEBUG_FAST)"
+              elif [ ! -d tests/unit_tests ]; then
+                echo "No unit tests found, skipping"
+              else
+                run_suite unit -vv $XDIST_ARGS tests/unit_tests \
+                  --html=/workspace/test-reports/unit-tests.html \
+                  --self-contained-html \
+                  --cov="$PACKAGE_NAME_ENV" \
+                  --cov-report=html:/workspace/test-reports/coverage-unit
+              fi
+              exit $rc
+            '
 
       - name: Core unit tests (plugin repos)
-        if: ${{ env.CI_DEBUG_FAST != 'true' && env.IS_PLUGIN == 'true' && inputs.run_core_tests }}
+        if: ${{ !cancelled() && steps.smoke.outcome == 'success' && env.CI_DEBUG_FAST != 'true' && env.IS_PLUGIN == 'true' && inputs.run_core_tests }}
         continue-on-error: ${{ inputs.continue_on_plugins_unit_error }}
         run: |
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
             --user root \
             -v "$(pwd)":/workspace -w /workspace \
+            -e XDIST_ARGS \
             "$IMAGE_TAG" \
-            bash -c "
+            bash -c '
               git config --global --add safe.directory /workspace
-              pip install -e '.[test]' pytest-html
+              pip install -e ".[test]" pytest-html pytest-xdist
               create_plugin_registries
-              pytest -vv /packages/geoips/tests/unit_tests \
+              mkdir -p /workspace/test-reports
+              result=PASSED
+              pytest -vv $XDIST_ARGS /packages/geoips/tests/unit_tests \
                 --html=/workspace/test-reports/core-unit-tests.html \
-                --self-contained-html
-            "
+                --self-contained-html || result=FAILED
+              echo "| geoips | unit | $result |" >> /workspace/test-reports/core-summary.md
+              [ "$result" = PASSED ]
+            '
 
       - name: Drop symlinks from test reports
         if: always()
@@ -481,7 +505,8 @@ jobs:
 
       # The test data steps below run even if core lint/unit tests failed (the plugin
       # tests still use the data), but only when the image works and never after a
-      # cancel. Core integration tests still require every earlier step to pass.
+      # cancel. Every test step runs even if an earlier one failed, so that a run shows
+      # all failing tests; the job still fails if any of them failed.
       - name: Set testdata path
         if: ${{ !cancelled() && steps.smoke.outcome == 'success' && vars.CI_INTEGRATION != 'false' }}
         env:
@@ -575,7 +600,9 @@ jobs:
           fi
 
       - name: Run integration tests
-        if: ${{ vars.CI_INTEGRATION != 'false' }}
+        id: integ
+        # Also after core lint/unit failures, see "Set testdata path".
+        if: ${{ !cancelled() && steps.smoke.outcome == 'success' && env.TESTDATA_PATH != '' && vars.CI_INTEGRATION != 'false' }}
         continue-on-error: ${{ inputs.continue_on_core_integ_error }}
         env:
           CI_DOCKER_USER: ${{ vars.CI_DOCKER_USER }}
@@ -590,45 +617,58 @@ jobs:
             echo "Invalid CI_DOCKER_USER value"
             exit 1
           fi
+          # Test outputs go to the runner's disk, not Docker's: each pytest-xdist worker
+          # has its own GEOIPS_OUTDIRS, including its own geolocation cache (GBs).
+          # Removed in "Remove test outputs".
+          outdirs="${RUNNER_TEMP}/geoips-outdirs/core"
+          mkdir -p "$outdirs" && chmod a+rwx "$outdirs"
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
             --user "$DOCKER_USER" \
             -v "${TESTDATA_PATH}":/geoips_testdata \
+            -v "$outdirs":/output \
             -v "$(pwd)":/workspace -w /workspace \
             -e GEOIPS_TESTDATA_DIR=/geoips_testdata \
-            -e CI_DEBUG_FAST \
+            -e CI_DEBUG_FAST -e PACKAGE_NAME -e CURR_REPO -e XDIST_ARGS \
             "$IMAGE_TAG" \
-            bash -c "
+            bash -c '
               git config --global --add safe.directory /workspace
-              pip install -e '.[test]' pytest-html
+              pip install -e ".[test]" pytest-html pytest-xdist
               create_plugin_registries
-              echo '::group::Base integration'
-              pytest -vv --tb=short -m 'base and integration' \
+              mkdir -p /workspace/test-reports
+              rc=0
+              # run_suite <suite> <pytest args...>: see "Lint and unit tests".
+              run_suite() {
+                local suite="$1" result=PASSED; shift
+                echo "::group::$suite"
+                pytest "$@" || { result=FAILED; rc=1; }
+                echo "| $CURR_REPO | $suite | $result |" >> /workspace/test-reports/core-summary.md
+                echo "::endgroup::"
+              }
+              run_suite integration-base -vv --tb=short $XDIST_ARGS -m "base and integration" \
                 tests/integration_tests/test_*.py \
                 --no-fail-on-missing-data \
                 --html=/workspace/test-reports/integration-base.html \
                 --self-contained-html \
-                --cov=\"$PACKAGE_NAME\" \
+                --cov="$PACKAGE_NAME" \
                 --cov-report=html:/workspace/test-reports/coverage-integration-base
-              echo '::endgroup::'
-              if [ \"$CI_DEBUG_FAST\" = \"true\" ]; then
-                echo \"=== Skipping full integration: CI_DEBUG_FAST=true ===\"
+              if [ "$CI_DEBUG_FAST" = "true" ]; then
+                echo "=== Skipping full integration: CI_DEBUG_FAST=true ==="
               else
-                base_ram_gb=\$(awk '/MemTotal/{printf \"%.0f\", \$2/1024/1024}' /proc/meminfo)
-                if [ \$base_ram_gb -lt 17 ]; then
-                  echo \"=== Skipping full integration: \${base_ram_gb}GB RAM (need >= 17GB) ===\"
+                base_ram_gb=$(awk "/MemTotal/{printf \"%.0f\", \$2/1024/1024}" /proc/meminfo)
+                if [ "$base_ram_gb" -lt 17 ]; then
+                  echo "=== Skipping full integration: ${base_ram_gb}GB RAM (need >= 17GB) ==="
                 else
-                  echo '::group::Full integration'
-                  pytest -vv --tb=short -m 'full and integration' \
+                  run_suite integration-full -vv --tb=short $XDIST_ARGS -m "full and integration" \
                     tests/integration_tests/test_*.py \
                     --no-fail-on-missing-data \
                     --html=/workspace/test-reports/integration-full.html \
                     --self-contained-html \
-                    --cov=\"$PACKAGE_NAME\" \
+                    --cov="$PACKAGE_NAME" \
                     --cov-report=html:/workspace/test-reports/coverage-integration-full
-                  echo '::endgroup::'
                 fi
               fi
-            "
+              exit $rc
+            '
 
       - name: Run plugin tests (unit, lint, integration)
         # Also after core test failures, but not after a cancel (always() would start
@@ -648,9 +688,13 @@ jobs:
         run: |
           : "${TESTDATA_PATH:?TESTDATA_PATH is not set: the Set testdata path step did not run}"
           mkdir -p test-reports
+          # See "Run integration tests".
+          outdirs="${RUNNER_TEMP}/geoips-outdirs/plugins"
+          mkdir -p "$outdirs" && chmod a+rwx "$outdirs"
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
             --user "${CI_DOCKER_USER:-root}" \
             -v "${TESTDATA_PATH}":/geoips_testdata \
+            -v "$outdirs":/output \
             -v "$(pwd)":/workspace \
             -e GEOIPS_TESTDATA_DIR=/geoips_testdata \
             -e CI_DEBUG_FAST \
@@ -658,6 +702,7 @@ jobs:
             -e CONTINUE_PLUGINS_UNIT_ERROR \
             -e CONTINUE_PLUGINS_INTEG_ERROR \
             -e PRIVATE_PLUGIN_OUTPUT \
+            -e XDIST_ARGS \
             "$IMAGE_TAG" \
             bash -c '
               echo "::group::Scan /packages/"
@@ -669,7 +714,7 @@ jobs:
               found_count=0
               skip_count=0
               summary="/workspace/test-reports/plugin-summary.md"
-              pip install pytest-html --quiet
+              pip install pytest-html pytest-xdist --quiet
               # Written by the image build when it included private plugin repos.
               private_plugins=" $(tr "\n" " " < /packages/.private_plugins 2>/dev/null) "
               quiet=false
@@ -721,6 +766,7 @@ jobs:
                 [ -d "$pkg_dir/tests/unit_tests_long" ] && has_unit_long=true
                 if [ "$has_integ" = false ] && [ "$has_unit" = false ] && [ "$has_unit_long" = false ]; then
                   echo "NO TESTS $name: no unit or integration tests (lint only)"
+                  echo "| $name | tests | NO TESTS |" >> "$summary"
                   skip_count=$((skip_count + 1))
                   continue
                 fi
@@ -732,22 +778,22 @@ jobs:
 
                 if [ "$CI_DEBUG_FAST" != "true" ]; then
                   if [ "$has_unit" = true ]; then
-                    run_suite "$name" unit "$CONTINUE_PLUGINS_UNIT_ERROR" tests/unit_tests \
+                    run_suite "$name" unit "$CONTINUE_PLUGINS_UNIT_ERROR" $XDIST_ARGS tests/unit_tests \
                       $(html_args "$name-unit-tests.html")
                   fi
                   if [ "$has_unit_long" = true ]; then
-                    run_suite "$name" unit-long "$CONTINUE_PLUGINS_UNIT_ERROR" tests/unit_tests_long \
+                    run_suite "$name" unit-long "$CONTINUE_PLUGINS_UNIT_ERROR" $XDIST_ARGS tests/unit_tests_long \
                       $(html_args "$name-unit-tests-long.html")
                   fi
                 fi
                 if [ "$has_integ" = true ]; then
-                  run_suite "$name" integration-base "$CONTINUE_PLUGINS_INTEG_ERROR" -m "base and integration" \
+                  run_suite "$name" integration-base "$CONTINUE_PLUGINS_INTEG_ERROR" $XDIST_ARGS -m "base and integration" \
                     tests/integration_tests/test_*.py --no-fail-on-missing-data \
                     $(html_args "$name-integration-base.html")
                   if [ "$CI_DEBUG_FAST" = "true" ]; then
                     echo "$name/integration-full: SKIPPED (CI_DEBUG_FAST)"
                   else
-                    run_suite "$name" integration-full "$CONTINUE_PLUGINS_INTEG_ERROR" -m "full and integration" \
+                    run_suite "$name" integration-full "$CONTINUE_PLUGINS_INTEG_ERROR" $XDIST_ARGS -m "full and integration" \
                       tests/integration_tests/test_*.py --no-fail-on-missing-data \
                       $(html_args "$name-integration-full.html")
                   fi
@@ -770,14 +816,6 @@ jobs:
               fi
               echo "::endgroup::"
             '
-
-      - name: Plugin test summary
-        if: ${{ always() && env.IS_PLUGIN != 'true' && vars.CI_INTEGRATION != 'false' }}
-        run: |
-          # Written by test code inside the container: never follow a symlink.
-          if [ -f test-reports/plugin-summary.md ] && [ ! -L test-reports/plugin-summary.md ]; then
-            { echo "## Plugin test results"; cat test-reports/plugin-summary.md; } >> "$GITHUB_STEP_SUMMARY"
-          fi
 
       - name: Drop symlinks from test reports (integration)
         if: always()
@@ -845,6 +883,56 @@ jobs:
             docker rmi "$old_id" 2>/dev/null || true
           fi
 
+      - name: Test summary
+        if: always()
+        env:
+          CORE_FAILED: ${{ steps.smoke.outcome != 'success' || steps.lint.outcome == 'failure' || steps.integ.outcome == 'failure' }}
+        run: |
+          # Both files are written by test code inside containers: never follow a symlink.
+          # Rows: | <repo> | <suite> | PASSED, FAILED, FAILED (ignored) or NO TESTS |
+          reports=()
+          for f in test-reports/core-summary.md test-reports/plugin-summary.md; do
+            if [ -f "$f" ] && [ ! -L "$f" ]; then reports+=("$f"); fi
+          done
+          # One line per repository, this repository first. A repository whose steps
+          # failed before any suite recorded a result is reported as not run.
+          emoji=$(awk -F'|' -v core="$CURR_REPO" -v core_failed="$CORE_FAILED" '
+            function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+            {
+              name = trim($2); suite = trim($3); res = trim($4)
+              if (name == "" || name == "Plugin" || name ~ /^-+$/) next
+              if (!(name in seen)) { seen[name] = 1; order[++n] = name }
+              if (res == "FAILED") fail[name] = fail[name] " " suite
+              else if (res == "FAILED (ignored)") ign[name] = ign[name] " " suite
+              else if (res == "PASSED") pass[name] = 1
+            }
+            END {
+              if (!(core in seen))
+                print (core_failed == "true" ? "❌ " core " (tests did not run)" : "➖ " core " (no tests run)")
+              for (i = 1; i <= n; i++) {
+                p = order[i]
+                if (p in fail) {
+                  line = "❌ " p " (failed:" fail[p]
+                  if (p in ign) line = line "; ignored:" ign[p]
+                  print line ")"
+                }
+                else if (p in ign) print "⚠️ " p " (failed, ignored:" ign[p] ")"
+                else if (p in pass) print "✅ " p
+                else print "➖ " p " (no tests)"
+              }
+            }' "${reports[@]}" /dev/null)
+          echo "$emoji"
+          {
+            echo "## Test results"
+            echo ""
+            while IFS= read -r line; do echo "- $line"; done <<< "$emoji"
+            if [ -f test-reports/plugin-summary.md ] && [ ! -L test-reports/plugin-summary.md ]; then
+              echo ""
+              echo "### Plugin test results"
+              cat test-reports/plugin-summary.md
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # -------------------------------------------------------------------
       # Cleanup
       # -------------------------------------------------------------------
@@ -858,6 +946,16 @@ jobs:
           for c in $(docker ps -aq --filter "label=${CI_RUN_LABEL}"); do
             docker rm -f "$c" || true
           done
+
+      - name: Remove test outputs
+        if: always()
+        run: |
+          # Written by test containers, possibly as root: remove them from a container.
+          if [ -d "${RUNNER_TEMP}/geoips-outdirs" ]; then
+            docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
+              -v "${RUNNER_TEMP}":/runner_temp alpine:latest \
+              rm -rf /runner_temp/geoips-outdirs || true
+          fi
 
       - name: Fix workspace permissions for next run
         if: always()
