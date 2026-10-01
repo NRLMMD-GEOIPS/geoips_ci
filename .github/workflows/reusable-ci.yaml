@@ -339,6 +339,7 @@ jobs:
           fi
 
       - name: Smoke test
+        id: smoke
         run: |
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" "$IMAGE_TAG" python3 -c "import geoips; print(geoips.__version__)"
 
@@ -456,8 +457,11 @@ jobs:
       # Test data + integration (skipped when CI_INTEGRATION == 'false')
       # -------------------------------------------------------------------
 
+      # The test data steps below run even if core lint/unit tests failed (the plugin
+      # tests still use the data), but only when the image works and never after a
+      # cancel. Core integration tests still require every earlier step to pass.
       - name: Set testdata path
-        if: ${{ vars.CI_INTEGRATION != 'false' }}
+        if: ${{ !cancelled() && steps.smoke.outcome == 'success' && vars.CI_INTEGRATION != 'false' }}
         env:
           INPUT_TESTDATA_PATH: ${{ vars.TESTDATA_PATH }}
         run: |
@@ -480,13 +484,13 @@ jobs:
           fi
 
       - name: Ensure testdata directory exists on host
-        if: ${{ vars.CI_INTEGRATION != 'false' }}
+        if: ${{ !cancelled() && steps.smoke.outcome == 'success' && vars.CI_INTEGRATION != 'false' }}
         run: |
           mkdir -p "${TESTDATA_PATH}" || sudo mkdir -p "${TESTDATA_PATH}"
           chmod a+w "${TESTDATA_PATH}"
 
       - name: Clean stale test data
-        if: ${{ vars.CI_INTEGRATION != 'false' && vars.CLEAN_STALE_TESTDATA == 'true' }}
+        if: ${{ !cancelled() && steps.smoke.outcome == 'success' && vars.CI_INTEGRATION != 'false' && vars.CLEAN_STALE_TESTDATA == 'true' }}
         run: |
           echo "CLEAN_STALE_TESTDATA=true — removing test data dirs >30 days old"
           cleaned=$(find "${TESTDATA_PATH}" -maxdepth 1 -type d -name 'test_data_*' -mtime +30 -print -exec rm -rf {} \;)
@@ -498,7 +502,7 @@ jobs:
           fi
 
       - name: Download test datasets via ansible
-        if: ${{ vars.CI_INTEGRATION != 'false' }}
+        if: ${{ !cancelled() && steps.smoke.outcome == 'success' && vars.CI_INTEGRATION != 'false' }}
         env:
           DOCKER_BUILD_TARGET: ${{ vars.DOCKER_BUILD_TARGET }}
         run: |
@@ -531,7 +535,7 @@ jobs:
             "
 
       - name: Check test data
-        if: ${{ vars.CI_INTEGRATION != 'false' }}
+        if: ${{ !cancelled() && steps.smoke.outcome == 'success' && vars.CI_INTEGRATION != 'false' }}
         run: |
           echo "Test data: $(du -sh "${TESTDATA_PATH}" 2>/dev/null || echo 'empty')"
           stale=$(find "${TESTDATA_PATH}" -maxdepth 1 -type d -name 'test_data_*' -mtime +30 2>/dev/null)
@@ -605,7 +609,9 @@ jobs:
             "
 
       - name: Run plugin tests (unit, lint, integration)
-        if: ${{ always() && env.IS_PLUGIN != 'true' && vars.CI_INTEGRATION != 'false' }}
+        # Also after core test failures, but not after a cancel (always() would start
+        # this long step even then), and only with a working image and test data.
+        if: ${{ !cancelled() && steps.smoke.outcome == 'success' && env.TESTDATA_PATH != '' && env.IS_PLUGIN != 'true' && vars.CI_INTEGRATION != 'false' }}
         # No step-level continue-on-error: the script itself ignores unit/lint
         # failures if continue_on_plugins_unit_error and integration failures if
         # continue_on_plugins_integ_error, and fails the step otherwise.
@@ -615,6 +621,7 @@ jobs:
           CONTINUE_PLUGINS_UNIT_ERROR: ${{ inputs.continue_on_plugins_unit_error }}
           CONTINUE_PLUGINS_INTEG_ERROR: ${{ inputs.continue_on_plugins_integ_error }}
         run: |
+          : "${TESTDATA_PATH:?TESTDATA_PATH is not set: the Set testdata path step did not run}"
           mkdir -p test-reports
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
             --user "${CI_DOCKER_USER:-root}" \

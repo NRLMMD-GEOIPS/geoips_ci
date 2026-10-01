@@ -9,6 +9,10 @@ continuous integration:
     * A per-plugin, per-suite result table is written to the job summary and
       uploaded with the integration reports.
     * One failing plugin suite no longer stops the remaining plugins from running.
+    * The plugin tests still run when core lint or unit tests fail, but only if
+      the image passed its smoke test, and no longer after a cancelled run
+      (the step used ``always()``, so it also started after a cancel or a failed
+      build, failing on missing test data and hiding the real error).
     * ``continue_on_plugins_unit_error`` ignores plugin unit and lint failures and
       ``continue_on_plugins_integ_error`` ignores plugin integration failures; any
       other plugin failure fails the step. Previously
