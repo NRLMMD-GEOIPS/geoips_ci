@@ -1,0 +1,106 @@
+continuous integration:
+- title: 'Run unit and integration tests in parallel with pytest-xdist'
+  description: |
+    ``reusable-ci.yaml`` now runs the unit and integration tests of geoips and of
+    each plugin with ``pytest -n 16 --dist worksteal``. The ``CI_PYTEST_WORKERS``
+    variable changes the number of workers (``0`` or ``1``: serial). Lint is not
+    parallel, and the plugins are still tested one after another.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+    - 'README.md'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-01
+    finish: 2026-10-01
+- title: 'Emoji test summary for geoips and every plugin'
+  description: |
+    A new "Test summary" step at the end of ``reusable-ci.yaml`` lists geoips
+    and each plugin as passed, failed, failed but ignored, or without tests, in
+    the log and in the job summary. It replaces the "Plugin test summary" step;
+    the plugin results table is still in the job summary.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+    - 'README.md'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-01
+    finish: 2026-10-01
+continuous integration bug fixes:
+- title: 'Fail the core test steps when core tests fail'
+  description: |
+    The "Lint and unit tests" and "Run integration tests" steps ended their
+    scripts with ``echo``, so failing core lint, unit or base integration tests
+    did not fail the step. Each suite's result is now recorded and the step fails
+    if any of them failed (``continue_on_core_unit_error`` and
+    ``continue_on_core_integ_error`` still apply).
+
+    All test steps (core unit, core integration, plugin tests) now run even if an
+    earlier one failed, so a run shows every failing test; the job still fails.
+    Before, a core lint or unit failure skipped the core integration tests. As
+    before, the image is only pushed if every earlier step passed, which now
+    includes the core tests.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-01
+    finish: 2026-10-01
+- title: 'Enough /dev/shm and disk space for parallel tests'
+  description: |
+    With 16 pytest-xdist workers, multiprocessing in the integration tests filled
+    Docker's default 64MB ``/dev/shm`` (``OSError: [Errno 28] No space left on
+    device`` from ``SemLock``). The test containers now get ``--shm-size``
+    ``CI_SHM_SIZE`` (default ``16g``; 16 workers used up to 8.6GB).
+
+    Test outputs in ``$RUNNER_TEMP/geoips-outdirs`` are also removed at the start
+    of a run if an earlier run left them, and a run fails before testing if less
+    than ``CI_MIN_FREE_OUTPUT_GB`` (default 150) is free there.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+    - 'README.md'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-01
+    finish: 2026-10-01
+- title: 'Mount city_lights where ancildat reads it'
+  description: |
+    ancildat reads ``city_lights.bin`` from ``GEOIPS_ANCILDAT``, fixed at build
+    time to ``/output/ancildat``, but ``geoips config install city_lights`` puts
+    it in the test data directory, so geocolor tests failed with ``Cannot open
+    file '/output/ancildat/city_lights/city_lights.bin'``. The integration test
+    containers now mount the test data copy there, read-only.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-01
+    finish: 2026-10-01
+- title: 'Do not test shapefiles_clone as a plugin'
+  description: |
+    ``/packages/shapefiles_clone`` is the Natural Earth checkout behind the
+    cartopy shapefiles, not a plugin: its third-party code failed flake8 and
+    black. The plugin test step now skips it.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-05
+    finish: 2026-10-05

@@ -26,7 +26,8 @@ on:
 #   pull_request:
 #     types:
 #       - closed
-#     branch: main
+#     branches:
+#       - main
 
 jobs:
   check-release-branch:
@@ -71,7 +72,7 @@ jobs:
       - name: Setup git enviorment
         run: |
           git config --global user.name 'GitHub Actions'
-          git config --global user.email 'github-actions@${GITHUB_SERVER_URL/https:\/\//}'
+          git config --global user.email "github-actions@${GITHUB_SERVER_URL/https:\/\//}"
 
       - name: Tag commit
         run: |
@@ -82,10 +83,12 @@ jobs:
           git -C current_repo_current_branch push --tags
 
       - name: Create Release!
+        env:
+          GH_LOGIN_TOKEN: ${{ secrets.token }}
         run: |
           cd current_repo_current_branch
           SERVER_URL=${GITHUB_SERVER_URL/https:\/\//}
-          echo ${{ secrets.token }} | gh auth login --hostname ${SERVER_URL} --with-token
+          printf '%s' "$GH_LOGIN_TOKEN" | gh auth login --hostname "${SERVER_URL}" --with-token
 
           echo "gh release create ${{ needs.get-versions.outputs.TAGGED_VERSION }} --generate-notes"
 

@@ -1,0 +1,47 @@
+name: Check CI scripts
+
+# Checks for this repository itself, on a GitHub-hosted runner (no secrets, no
+# self-hosted runner, so pull requests from forks are safe to run):
+#   - shellcheck on scripts/
+#   - safety tests of scripts/runner-prune.sh (it deletes on a shared Docker host)
+#   - every reference to this repository's reusable workflows points at @main:
+#     a branch pin is useful while testing a branch, but merged it would make
+#     every caller depend on that branch
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: shellcheck
+        run: shellcheck scripts/*.sh
+
+      - name: runner-prune.sh safety tests
+        run: bash scripts/test-runner-prune.sh
+
+      - name: Reusable workflow references point at main
+        run: |
+          refs=$(grep -rnE 'uses: *NRLMMD-GEOIPS/geoips_ci/\.github/workflows/[^@[:space:]]+@' \
+                   .github/workflows sync sync_external \
+                 | grep -vE '^[^:]+:[0-9]+: *#' \
+                 | grep -vE '@main([[:space:]]|$)' || true)
+          if [ -n "$refs" ]; then
+            echo "$refs"
+            echo "::error::Reusable workflow references above do not point at @main"
+            exit 1
+          fi
+          echo "All reusable workflow references point at @main"

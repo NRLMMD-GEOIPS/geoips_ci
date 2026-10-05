@@ -1,0 +1,47 @@
+bug fix:
+- title: 'Fix actionlint and shellcheck findings in reusable workflows'
+  description: |
+    * ``reusable-proper-release-note-edits.yaml``: the release-branch check used
+      ``[[ ${{ ... == 'true' }} ]]``, which expands to ``[[ true ]]`` or
+      ``[[ false ]]`` and was always true, so regular pull requests also allowed
+      renamed release notes. It now compares an environment variable to ``true``.
+      ``print-variables`` also waits for ``get-versions`` so ``TAGGED_VERSION``
+      is no longer empty, and the release-note glob checks use ``compgen -G``.
+    * ``reusable-lint.yaml``: define the ``check-release-branch`` job that
+      ``print-variables`` already referenced.
+    * ``tag-and-release.yaml`` (and its ``sync`` copy): ``branch: main`` is not a
+      valid ``pull_request`` key and was ignored. It is now ``branches: [main]``,
+      so pull requests closed against other branches no longer start it.
+    * ``reusable-tag-and-release.yaml``: the git user email was single-quoted and
+      committed as literal text, and the release token was inlined in the script.
+    * ``reusable-print-variables.yaml``: ``github.head_ref`` is passed through an
+      environment variable, and references to undefined ``github.context``,
+      ``needs.set-variables`` and ``inputs.FLAGS`` are removed.
+    * ``reusable-ci.yaml``: GHCR image references used ``github.repository``
+      as is (``NRLMMD-GEOIPS/geoips``), which Docker rejects because repository
+      names must be lowercase. The build-cache pull therefore always failed
+      (hidden by ``|| true``), and the build-cache and ``latest`` pushes could not
+      work. They now use the lowercased name, as does the optional registry push
+      for ``DOCKER_REGISTRY_USER``.
+    * ``reusable-ci.yaml``: replace deprecated ``save-always`` with
+      ``actions/cache/restore`` and ``actions/cache/save``.
+    * Quote shell variables and use ``$(...)`` in the reusable workflows.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+    - '.github/workflows/reusable-doc-test.yaml'
+    - '.github/workflows/reusable-get-versions.yaml'
+    - '.github/workflows/reusable-lint.yaml'
+    - '.github/workflows/reusable-build-docker-image.yaml'
+    - '.github/workflows/reusable-check-release-branch.yaml'
+    - '.github/workflows/reusable-print-variables.yaml'
+    - '.github/workflows/reusable-proper-release-note-edits.yaml'
+    - '.github/workflows/reusable-tag-and-release.yaml'
+    - '.github/workflows/tag-and-release.yaml'
+    - 'sync/.github/workflows/tag-and-release.yaml'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-09-30
+    finish: 2026-09-30

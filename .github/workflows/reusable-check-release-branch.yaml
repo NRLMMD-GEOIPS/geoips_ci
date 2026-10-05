@@ -22,10 +22,10 @@ jobs:
           echo "Base ref: ${GITHUB_BASE_REF}"
           if [[ "${GITHUB_HEAD_REF}" =~ "v"*"-version-release" ]]; then
             echo "IS_VERSION_RELEASE_BRANCH=true"
-            echo "IS_VERSION_RELEASE_BRANCH=true" >> $GITHUB_ENV
-            echo "IS_VERSION_RELEASE_BRANCH=true" >> $GITHUB_OUTPUT
+            echo "IS_VERSION_RELEASE_BRANCH=true" >> "$GITHUB_ENV"
+            echo "IS_VERSION_RELEASE_BRANCH=true" >> "$GITHUB_OUTPUT"
           else
             echo "IS_VERSION_RELEASE_BRANCH=false"
-            echo "IS_VERSION_RELEASE_BRANCH=false" >> $GITHUB_ENV
-            echo "IS_VERSION_RELEASE_BRANCH=false" >> $GITHUB_OUTPUT
+            echo "IS_VERSION_RELEASE_BRANCH=false" >> "$GITHUB_ENV"
+            echo "IS_VERSION_RELEASE_BRANCH=false" >> "$GITHUB_OUTPUT"
           fi

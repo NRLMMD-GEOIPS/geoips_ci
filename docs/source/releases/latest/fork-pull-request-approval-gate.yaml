@@ -1,0 +1,58 @@
+continuous integration:
+- title: 'Require organization approval before fork pull requests use self-hosted runners'
+  description: |
+    Pull requests from forks no longer start any self-hosted job until a
+    required reviewer approves the run. This covers ``reusable-ci.yaml``,
+    ``reusable-lint.yaml``, ``reusable-doc-test.yaml`` and
+    ``reusable-proper-release-note-edits.yaml``.
+
+    * New ``reusable-fork-gate.yaml`` lets trusted runs through (push, dispatch,
+      schedule, release, merge queue, repository dispatch and same-repository
+      pull requests) and holds everything else, including fork pull requests, on a
+      GitHub Environment (default ``fork-approval``, configurable with the
+      ``fork_approval_environment`` input). Create that environment in each
+      repository and add an organization team as required reviewers. Without
+      required reviewers fork runs are NOT held for approval.
+    * Every self-hosted job depends on the gate and is skipped unless it
+      allowed the run. A rejected or expired approval skips all of them.
+    * The gate cannot stop a fork from editing an in-repository workflow such as
+      ``integ_test.yaml`` and removing it, because GitHub runs the pull request's
+      copy of the workflow. It is tamper-proof for the ``ruleset-*`` workflows
+      used as organization required workflows. Also enable "Require approval for
+      all external contributors" in the Actions settings, see the README.
+    * Approving a fork run means running its code on the self-hosted runner, as
+      root inside containers with the workspace and test data mounted.
+    * Each workflow run needs its own approval, and a new push to the pull
+      request needs approval again.
+    * Approved fork runs of ``reusable-ci.yaml`` use a clean checkout, never push
+      the build cache, registry image or ``latest`` image, and empty the workspace
+      (including ``.git``) when they finish, as do the ``reusable-doc-test.yaml``
+      container jobs. The checkout no longer stores the job
+      token in ``.git/config``, which the Docker build copied into the image.
+    * Fork pull requests have no registry credentials, so ``docker_token`` is no
+      longer a required secret of ``reusable-doc-test.yaml`` and
+      ``reusable-build-docker-image.yaml``. For fork pull requests of ``geoips``
+      the per-commit doclinttest image is neither built nor pushed and the
+      ``doclinttest-latest`` image is used, as for plugin repositories.
+    * ``reusable-get-versions.yaml`` now rejects a ``tagged_version`` that is not a
+      single plain version string (surrounding whitespace is ignored) and no longer
+      prints the raw file. The value comes from the pull request branch
+      and is used in shell scripts and ``GITHUB_ENV``/``GITHUB_OUTPUT`` by other
+      jobs. ``reusable-ci.yaml`` applies the same check to the package name read
+      from ``pyproject.toml``.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+    - '.github/workflows/reusable-lint.yaml'
+    - '.github/workflows/reusable-doc-test.yaml'
+    - '.github/workflows/reusable-build-docker-image.yaml'
+    - '.github/workflows/reusable-proper-release-note-edits.yaml'
+    - '.github/workflows/reusable-get-versions.yaml'
+    added:
+    - '.github/workflows/reusable-fork-gate.yaml'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-09-30
+    finish: 2026-09-30
