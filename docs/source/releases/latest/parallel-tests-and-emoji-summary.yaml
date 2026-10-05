@@ -74,3 +74,19 @@ continuous integration bug fixes:
   date:
     start: 2026-10-01
     finish: 2026-10-01
+- title: 'Mount city_lights where ancildat reads it'
+  description: |
+    ancildat reads ``city_lights.bin`` from ``GEOIPS_ANCILDAT``, fixed at build
+    time to ``/output/ancildat``, but ``geoips config install city_lights`` puts
+    it in the test data directory, so geocolor tests failed with ``Cannot open
+    file '/output/ancildat/city_lights/city_lights.bin'``. The integration test
+    containers now mount the test data copy there, read-only.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-01
+    finish: 2026-10-01

@@ -656,11 +656,18 @@ jobs:
           # Removed in "Remove test outputs".
           outdirs="${RUNNER_TEMP}/geoips-outdirs/core"
           mkdir -p "$outdirs" && chmod a+rwx "$outdirs"
+          # ancildat reads city_lights from GEOIPS_ANCILDAT, fixed at build time to
+          # /output/ancildat, but "geoips config install" puts it in the test data.
+          ancil_mount=()
+          if [ -d "${TESTDATA_PATH}/city_lights" ]; then
+            ancil_mount=(-v "${TESTDATA_PATH}/city_lights":/output/ancildat/city_lights:ro)
+          fi
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
             --shm-size "$SHM_SIZE" \
             --user "$DOCKER_USER" \
             -v "${TESTDATA_PATH}":/geoips_testdata \
             -v "$outdirs":/output \
+            "${ancil_mount[@]}" \
             -v "$(pwd)":/workspace -w /workspace \
             -e GEOIPS_TESTDATA_DIR=/geoips_testdata \
             -e CI_DEBUG_FAST -e PACKAGE_NAME -e CURR_REPO -e XDIST_ARGS \
@@ -726,11 +733,16 @@ jobs:
           # See "Run integration tests".
           outdirs="${RUNNER_TEMP}/geoips-outdirs/plugins"
           mkdir -p "$outdirs" && chmod a+rwx "$outdirs"
+          ancil_mount=()
+          if [ -d "${TESTDATA_PATH}/city_lights" ]; then
+            ancil_mount=(-v "${TESTDATA_PATH}/city_lights":/output/ancildat/city_lights:ro)
+          fi
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
             --shm-size "$SHM_SIZE" \
             --user "${CI_DOCKER_USER:-root}" \
             -v "${TESTDATA_PATH}":/geoips_testdata \
             -v "$outdirs":/output \
+            "${ancil_mount[@]}" \
             -v "$(pwd)":/workspace \
             -e GEOIPS_TESTDATA_DIR=/geoips_testdata \
             -e CI_DEBUG_FAST \
