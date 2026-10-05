@@ -210,6 +210,23 @@ repos token available (never in fork runs).
 This replaces checking out a branch of the same name in every repo
 (``GEOIPS_MODIFIED_BRANCH``).
 
+Disabling plugin repos
+----------------------
+
+geoips can leave plugin repos out of its CI image, for example while their install is
+broken, by listing them in ``.github/ci-disabled-repos.yaml`` with the reason:
+
+.. code-block:: yaml
+
+   synth_green: "install fails, see NRLMMD-GEOIPS/synth_green#12"
+
+The file applies to every branch (it is not keyed by branch). The workflow passes the
+names to the image build as ``DISABLED_REPOS`` and lists them in the job summary; the
+install playbook removes them from its plugin repo lists, so they are not installed or
+tested. A name the playbook does not install, or that is also overridden in
+``.github/ci-dependencies.yaml``, fails the build. Plugin repositories test in the
+published image, so the file is rejected there.
+
 Self-hosted runner maintenance
 ------------------------------
 

@@ -135,6 +135,13 @@ on:
 #   A requested ref that does not exist fails the build. Runs with overrides say so
 #   in the job summary and never push images. Plugin repositories only support
 #   python overrides (their image is not built here).
+#
+# DISABLED REPOS (repos the geoips image does not install):
+#   .github/ci-disabled-repos.yaml maps repo names to the reason they are disabled,
+#   for every branch (it is not keyed by branch):
+#     synth_green: "install fails, see NRLMMD-GEOIPS/synth_green#12"
+#   The image build skips those repos (DISABLED_REPOS build argument) and the job
+#   summary lists them. Only geoips (whose CI builds the image) supports this file.
 
 defaults:
   run:
@@ -391,6 +398,61 @@ jobs:
               summary.write("".join(f"- `{l}`\n" for l in lines) + "\n")
           EOF
 
+      - name: Read disabled repos
+        run: |
+          # See "DISABLED REPOS" at the top. Sets DISABLED_REPOS ("repo repo ...") for
+          # the image build.
+          file=.github/ci-disabled-repos.yaml
+          if [ ! -f "$file" ] || [ -L "$file" ]; then
+            echo "No disabled repos"
+            echo "DISABLED_REPOS=" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if ! python3 -c 'import yaml' 2>/dev/null; then
+            echo "::error::Reading disabled repos needs python3 with PyYAML on the runner"
+            exit 1
+          fi
+          python3 - "$file" <<'EOF'
+          import os, re, sys
+          import yaml
+
+          source = sys.argv[1]
+          errors = []
+          try:
+              with open(source) as f:
+                  data = yaml.safe_load(f) or {}
+          except yaml.YAMLError as exc:
+              data, errors = {}, [f"not valid YAML: {exc}"]
+          if not isinstance(data, dict):
+              data, errors = {}, ["must map repo names to the reason they are disabled"]
+          for name, reason in data.items():
+              if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9._-]+", name):
+                  errors.append(f"{name!r} is not a repository name")
+              if not isinstance(reason, str) or not reason.strip() or "\n" in reason.strip():
+                  errors.append(f"{name}: give the reason it is disabled, on one line")
+          if data and os.environ["IS_PLUGIN"] == "true":
+              errors.append(
+                  "plugin repositories test in the published geoips image, which is not"
+                  " rebuilt here; disable repos in geoips' .github/ci-disabled-repos.yaml"
+              )
+          if errors:
+              for e in errors:
+                  print(f"::error::Disabled repos from {source}: {e}")
+              sys.exit(1)
+
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              env.write("DISABLED_REPOS=" + " ".join(data) + "\n")
+          if not data:
+              print(f"{source} disables no repos")
+              sys.exit(0)
+          lines = [f"{n}: {r.strip()}" for n, r in data.items()]
+          print(f"Disabled repos from {source}:")
+          print("\n".join("  " + l for l in lines))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write(f"## ⏸️ Disabled repos\n\nNot installed in the image ({source}):\n\n")
+              summary.write("".join(f"- `{n}`: {r.strip()}\n" for n, r in data.items()) + "\n")
+          EOF
+
       - name: Set pytest-xdist workers and /dev/shm size
         env:
           PYTEST_WORKERS: ${{ vars.CI_PYTEST_WORKERS || '16' }}
@@ -501,6 +563,7 @@ jobs:
             --build-arg EDITABLE_PIP_INSTALL="$EDITABLE_PIP_INSTALL" \
             --build-arg REPO_BRANCHES="$REPO_BRANCHES" \
             --build-arg PIP_OVERRIDES="$PIP_OVERRIDES" \
+            --build-arg DISABLED_REPOS="$DISABLED_REPOS" \
             "${private_args[@]}" \
             --progress=plain \
             .
