@@ -90,3 +90,17 @@ continuous integration bug fixes:
   date:
     start: 2026-10-01
     finish: 2026-10-01
+- title: 'Do not test shapefiles_clone as a plugin'
+  description: |
+    ``/packages/shapefiles_clone`` is the Natural Earth checkout behind the
+    cartopy shapefiles, not a plugin: its third-party code failed flake8 and
+    black. The plugin test step now skips it.
+  files:
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-05
+    finish: 2026-10-05

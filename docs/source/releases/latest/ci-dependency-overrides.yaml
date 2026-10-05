@@ -1,0 +1,29 @@
+continuous integration:
+- title: 'Test against other branches or versions with .github/ci-dependencies.yaml'
+  description: |
+    ``reusable-ci.yaml`` reads test-only dependency overrides from the entry for
+    the branch under test in ``.github/ci-dependencies.yaml`` (keyed by branch
+    name, so merging it affects no other branch), or from the new
+    ``dependency_overrides`` input: ``python`` (pip requirements, including git
+    URLs, installed last in the image) and ``repos`` (the branch, tag or commit to
+    clone repos at, geoips only). A requested ref that does not exist fails the
+    build. The job summary lists the overrides and what they installed, and images
+    built with them are never pushed. Plugin repositories apply ``python``
+    overrides on top of the published geoips image.
+
+    Builds no longer pass ``GEOIPS_MODIFIED_BRANCH`` (checking out the pull
+    request's branch name in every repo that has it). The ``pip_editable`` input
+    now reaches the build as ``EDITABLE_PIP_INSTALL``; before, it was passed as
+    ``PIP_EDITABLE``, which the Dockerfile does not read, so it had no effect.
+  files:
+    added:
+    - 'docs/source/releases/latest/ci-dependency-overrides.yaml'
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+    - 'README.md'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-05
+    finish: 2026-10-05

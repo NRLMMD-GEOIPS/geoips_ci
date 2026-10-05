@@ -38,6 +38,14 @@ on:
         required: false
         type: boolean
         default: false
+      dependency_overrides:
+        description: >
+          Test-only dependency overrides for this run: one entry of
+          .github/ci-dependencies.yaml (python and/or repos, not keyed by branch),
+          used instead of that file. For manual runs (workflow_dispatch).
+        required: false
+        type: string
+        default: ""
       fork_approval_environment:
         description: >
           GitHub Environment (with required reviewers) that must approve a run
@@ -112,6 +120,21 @@ on:
 #   NOTE: a fork can edit an in-repo caller workflow and drop this gate. Also
 #   enable "Require approval for all external contributors" in the repository
 #   or organization Actions settings, see reusable-fork-gate.yaml.
+#
+# DEPENDENCY OVERRIDES (testing a branch against other branches or versions):
+#   .github/ci-dependencies.yaml maps branch names to overrides. Only the entry of
+#   the branch under test (the pull request's head branch, else the pushed branch)
+#   applies, so the file can be merged: other branches, main included, are not
+#   affected. A run may instead get one entry as the dependency_overrides input.
+#     my-feature-branch:
+#       python:   # pip requirements, installed last in the image (they win)
+#         - "pluginify @ git+https://github.com/NRLMMD-GEOIPS/pluginify@my-fix"
+#         - "xarray==2025.6.1"
+#       repos:    # repos the geoips image clones: repo -> branch, tag or commit
+#         recenter_tc: my-fix
+#   A requested ref that does not exist fails the build. Runs with overrides say so
+#   in the job summary and never push images. Plugin repositories only support
+#   python overrides (their image is not built here).
 
 defaults:
   run:
@@ -268,6 +291,106 @@ jobs:
           echo "PACKAGE_NAME=${PACKAGE_NAME}" >> "$GITHUB_ENV"
           echo "Detected package: ${PACKAGE_NAME}"
 
+      - name: Read dependency overrides
+        env:
+          OVERRIDES_INPUT: ${{ inputs.dependency_overrides }}
+        run: |
+          # See "DEPENDENCY OVERRIDES" at the top. Sets HAS_OVERRIDES, PIP_OVERRIDES (one
+          # requirement per line) and REPO_BRANCHES ("repo=ref ...") for the image build.
+          file=.github/ci-dependencies.yaml
+          # The branch under test: the pull request's head branch, else the pushed or
+          # dispatched branch. Merge queue branches (gh-readonly-queue/...) match none.
+          branch="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if [ -n "$OVERRIDES_INPUT" ]; then
+            source_name="the dependency_overrides input"
+            path="${RUNNER_TEMP}/ci-dependencies.yaml"
+            printf '%s\n' "$OVERRIDES_INPUT" > "$path"
+            branch=""
+          elif [ -f "$file" ] && [ ! -L "$file" ]; then
+            source_name="$file, branch $branch"
+            path="$file"
+          else
+            echo "No dependency overrides"
+            { echo "HAS_OVERRIDES=false"; echo "PIP_OVERRIDES="; echo "REPO_BRANCHES="; } >> "$GITHUB_ENV"
+            exit 0
+          fi
+          if ! python3 -c 'import yaml' 2>/dev/null; then
+            echo "::error::Reading dependency overrides needs python3 with PyYAML on the runner"
+            exit 1
+          fi
+          SOURCE_NAME="$source_name" BRANCH="$branch" python3 - "$path" <<'EOF'
+          import os, re, sys, uuid
+          import yaml
+
+          source = os.environ["SOURCE_NAME"]
+          errors = []
+          try:
+              with open(sys.argv[1]) as f:
+                  data = yaml.safe_load(f) or {}
+          except yaml.YAMLError as exc:
+              data, errors = {}, [f"not valid YAML: {exc}"]
+          branch = os.environ["BRANCH"]
+          if branch:
+              # The file: branch name -> entry. Only this branch's entry is read.
+              if not isinstance(data, dict):
+                  data, errors = {}, ["must map branch names to 'python' and/or 'repos'"]
+              data = data.get(branch) or {}
+          if not isinstance(data, dict):
+              data, errors = {}, ["must be a mapping with 'python' and/or 'repos'"]
+          for key in sorted(set(data) - {"python", "repos"}):
+              errors.append(f"unknown key '{key}' (only 'python' and 'repos')")
+
+          python = data.get("python") or []
+          if not isinstance(python, list):
+              errors.append("'python' must be a list of pip requirements")
+              python = []
+          for req in python:
+              # One requirement per line; no pip options (-e, --index-url, ...).
+              if not isinstance(req, str) or not req.strip() or "\n" in req or "\r" in req:
+                  errors.append(f"python: {req!r} is not a single-line pip requirement")
+              elif req.strip().startswith("-"):
+                  errors.append(f"python: {req!r}: pip options are not supported")
+          python = [r.strip() for r in python if isinstance(r, str)]
+
+          repos = data.get("repos") or {}
+          if not isinstance(repos, dict):
+              errors.append("'repos' must map repo names to a branch, tag or commit")
+              repos = {}
+          for name, ref in repos.items():
+              if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9._-]+", name):
+                  errors.append(f"repos: {name!r} is not a repository name")
+              if not isinstance(ref, str):
+                  errors.append(f"repos: {name}: quote the ref ({ref!r} is not a string)")
+              elif not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._/-]*", ref) or ".." in ref:
+                  errors.append(f"repos: {name}: {ref!r} is not a branch, tag or commit")
+          if repos and os.environ["IS_PLUGIN"] == "true":
+              errors.append(
+                  "repos: plugin repositories test in the published geoips image, which"
+                  " is not rebuilt here; use python overrides instead, for example"
+                  " 'geoips @ git+https://github.com/NRLMMD-GEOIPS/geoips@<branch>'"
+              )
+
+          if errors:
+              for e in errors:
+                  print(f"::error::Dependency overrides from {source}: {e}")
+              sys.exit(1)
+
+          delim = f"EOF_{uuid.uuid4().hex}"
+          with open(os.environ["GITHUB_ENV"], "a") as env:
+              env.write(f"HAS_OVERRIDES={'true' if python or repos else 'false'}\n")
+              env.write(f"PIP_OVERRIDES<<{delim}\n" + "".join(r + "\n" for r in python) + f"{delim}\n")
+              env.write("REPO_BRANCHES=" + " ".join(f"{n}={r}" for n, r in repos.items()) + "\n")
+          if not (python or repos):
+              print(f"{source} has no overrides")
+              sys.exit(0)
+          lines = [f"python: {r}" for r in python] + [f"repo: {n} at {r}" for n, r in repos.items()]
+          print(f"Dependency overrides from {source}:")
+          print("\n".join("  " + l for l in lines))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write(f"## ⚠️ Dependency overrides in effect\n\nFrom {source} (test-only):\n\n")
+              summary.write("".join(f"- `{l}`\n" for l in lines) + "\n")
+          EOF
+
       - name: Set pytest-xdist workers and /dev/shm size
         env:
           PYTEST_WORKERS: ${{ vars.CI_PYTEST_WORKERS || '16' }}
@@ -333,7 +456,6 @@ jobs:
             --target deps \
             --tag geoips:cache \
             --build-arg EXTRA_PLUGINS="$EXTRA_PLUGINS" \
-            --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
             --progress=plain \
             .
           # Remove the previous cache image if this build left it untagged: it cannot
@@ -350,7 +472,7 @@ jobs:
         env:
           DOCKER_BUILD_TARGET: ${{ vars.DOCKER_BUILD_TARGET || 'geoips-site' }}
           EXTRA_PLUGINS: ${{ vars.EXTRA_PLUGINS || '' }}
-          PIP_EDITABLE: ${{ inputs.pip_editable }}
+          EDITABLE_PIP_INSTALL: ${{ inputs.pip_editable }}
           # Empty for fork pull requests: GitHub does not pass them secrets.
           PRIVATE_REPOS_TOKEN: ${{ secrets.private_repos_token }}
         run: |
@@ -376,8 +498,9 @@ jobs:
             --target "$DOCKER_BUILD_TARGET" \
             --tag "$IMAGE_TAG" \
             --build-arg EXTRA_PLUGINS="$EXTRA_PLUGINS" \
-            --build-arg GEOIPS_MODIFIED_BRANCH="${GITHUB_HEAD_REF}" \
-            --build-arg PIP_EDITABLE="$PIP_EDITABLE" \
+            --build-arg EDITABLE_PIP_INSTALL="$EDITABLE_PIP_INSTALL" \
+            --build-arg REPO_BRANCHES="$REPO_BRANCHES" \
+            --build-arg PIP_OVERRIDES="$PIP_OVERRIDES" \
             "${private_args[@]}" \
             --progress=plain \
             .
@@ -411,6 +534,89 @@ jobs:
           if [ -n "$old_id" ] && [ "$(docker image inspect -f '{{len .RepoTags}}' "$old_id" 2>/dev/null)" = "0" ]; then
             docker rmi "$old_id" 2>/dev/null || true
           fi
+
+      - name: Apply dependency overrides (plugin repos)
+        if: ${{ env.IS_PLUGIN == 'true' && env.PIP_OVERRIDES != '' }}
+        env:
+          # Empty for fork pull requests: GitHub does not pass them secrets.
+          PRIVATE_REPOS_TOKEN: ${{ secrets.private_repos_token }}
+        run: |
+          # Same as the PIP_OVERRIDES step of geoips' Dockerfile, which the published
+          # image may predate. The token (for git URLs of private repos) is a BuildKit
+          # secret, see geoips tests/ansible/scripts/github-token-env.sh.
+          secret_args=()
+          if [ -n "$PRIVATE_REPOS_TOKEN" ] && [ "$IS_FORK" != "true" ]; then
+            token_file="${RUNNER_TEMP}/geoips_private_token"
+            trap 'rm -f "$token_file"' EXIT
+            (umask 077 && printf '%s' "$PRIVATE_REPOS_TOKEN" > "$token_file")
+            secret_args=(--secret "id=geoips_private_token,src=${token_file}")
+          fi
+          DOCKER_BUILDKIT=1 docker build \
+            --tag "$IMAGE_TAG" \
+            --build-arg BASE="$IMAGE_TAG" \
+            --build-arg BASE_USER="$(docker image inspect -f '{{.Config.User}}' "$IMAGE_TAG")" \
+            --build-arg PIP_OVERRIDES="$PIP_OVERRIDES" \
+            "${secret_args[@]}" \
+            --progress=plain \
+            - <<'DOCKERFILE'
+          ARG BASE
+          FROM ${BASE}
+          USER root
+          ARG PIP_OVERRIDES
+          RUN --mount=type=secret,id=geoips_private_token \
+              f=/run/secrets/geoips_private_token; \
+              if [ -s "$f" ]; then \
+                GIT_CONFIG_COUNT=1 \
+                GIT_CONFIG_KEY_0="http.https://github.com/.extraheader" \
+                GIT_CONFIG_VALUE_0="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$(tr -d ' \r\n' < "$f")" | base64 | tr -d '\n')"; \
+                export GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0; \
+              fi \
+              && printf '%s\n' "$PIP_OVERRIDES" > /tmp/pip-overrides.txt \
+              && pip freeze | sort > /tmp/freeze-before.txt \
+              && pip install --no-cache-dir -r /tmp/pip-overrides.txt \
+              && pip freeze | sort > /tmp/freeze-after.txt \
+              && comm -13 /tmp/freeze-before.txt /tmp/freeze-after.txt \
+                 > ${GEOIPS_PACKAGES_DIR:-/packages}/.ci_pip_overrides \
+              && { pip check || echo "WARNING: the overrides conflict with pinned dependencies"; } \
+              && rm /tmp/pip-overrides.txt /tmp/freeze-before.txt /tmp/freeze-after.txt
+          ARG BASE_USER
+          USER ${BASE_USER:-root}
+          DOCKERFILE
+
+      - name: Check dependency overrides in the image
+        if: ${{ env.HAS_OVERRIDES == 'true' }}
+        run: |
+          # The image records what the overrides changed. A missing record means the
+          # build target does not apply them (only geoips-site does): fail rather than
+          # test without them.
+          out=$(docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" "$IMAGE_TAG" sh -c '
+            d=${GEOIPS_PACKAGES_DIR:-/packages}
+            for f in .ci_pip_overrides .ci_repo_branches; do
+              if [ -f "$d/$f" ]; then echo "== $f"; cat "$d/$f"; else echo "== $f missing"; fi
+            done')
+          echo "$out"
+          missing=()
+          if [ -n "$PIP_OVERRIDES" ] && grep -qx '== .ci_pip_overrides missing' <<<"$out"; then
+            missing+=(python)
+          fi
+          if [ -n "$REPO_BRANCHES" ] && grep -qx '== .ci_repo_branches missing' <<<"$out"; then
+            missing+=(repos)
+          fi
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::The image did not apply the ${missing[*]} dependency overrides (is DOCKER_BUILD_TARGET geoips-site?)"
+            exit 1
+          fi
+          {
+            echo "<details><summary>Installed by the overrides</summary>"
+            echo
+            echo '```'
+            awk '/^== / { f = $2; next }
+                 f == ".ci_pip_overrides" { print "python: " $0 }
+                 f == ".ci_repo_branches" { print "repo: " $1 " at " $2 " (" $3 ")" }' <<<"$out"
+            echo '```'
+            echo "</details>"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Smoke test
         id: smoke
@@ -794,6 +1000,9 @@ jobs:
               for pkg_dir in /packages/*/; do
                 name=$(basename "$pkg_dir")
                 [ "$name" = "geoips" ] && continue
+                # Not a plugin: the Natural Earth checkout behind the cartopy shapefiles
+                # (geoips Dockerfile), third-party code with no tests.
+                [ "$name" = "shapefiles_clone" ] && continue
                 cd "$pkg_dir"
                 quiet=false; out_args="-vv --tb=short"
                 case "$private_plugins" in
@@ -896,7 +1105,7 @@ jobs:
       - name: Push image to registry
         # An image with private plugins is only pushed if the registry is known to be
         # private: set ALLOW_PRIVATE_IMAGE_PUSH=true.
-        if: ${{ vars.ENABLE_DOCKER_REGISTRY == 'true' && env.IS_PLUGIN != 'true' && env.IS_FORK != 'true' && (env.PRIVATE_PLUGINS_IN_IMAGE != 'true' || vars.ALLOW_PRIVATE_IMAGE_PUSH == 'true') }}
+        if: ${{ vars.ENABLE_DOCKER_REGISTRY == 'true' && env.IS_PLUGIN != 'true' && env.IS_FORK != 'true' && env.HAS_OVERRIDES != 'true' && (env.PRIVATE_PLUGINS_IN_IMAGE != 'true' || vars.ALLOW_PRIVATE_IMAGE_PUSH == 'true') }}
         env:
           DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
           DOCKER_REGISTRY: ${{ vars.DOCKER_REGISTRY }}
@@ -912,7 +1121,7 @@ jobs:
 
       - name: Push dev image to GHCR (core only, on merge to main)
         # Never with private plugins: plugin repos pull this image (it must stay public).
-        if: ${{ env.IS_PLUGIN != 'true' && env.IS_FORK != 'true' && env.PRIVATE_PLUGINS_IN_IMAGE != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        if: ${{ env.IS_PLUGIN != 'true' && env.IS_FORK != 'true' && env.PRIVATE_PLUGINS_IN_IMAGE != 'true' && env.HAS_OVERRIDES != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}

@@ -172,6 +172,44 @@ At the end of the run, the "Test summary" step lists every repository (geoips fi
 each plugin) with ✅ passed, ❌ failed, ⚠️ failed but ignored (``continue_on_*`` inputs)
 or ➖ no tests, in the log and in the job summary.
 
+Testing against other branches or versions
+------------------------------------------
+
+Repos are tested against the default branch of every other repo and the pinned package
+versions. A change that needs a change elsewhere can be tested before that one is merged
+with an entry for its branch in ``.github/ci-dependencies.yaml``:
+
+.. code-block:: yaml
+
+   my-feature-branch:
+     python:   # pip requirements, installed last in the image so they win
+       - "pluginify @ git+https://github.com/NRLMMD-GEOIPS/pluginify@my-fix"
+       - "xarray==2025.6.1"
+     repos:    # repos the geoips image clones: repo -> branch, tag or commit
+       recenter_tc: my-fix
+
+Only the entry of the branch under test applies (the pull request's head branch, or the
+pushed branch), so the file can be merged as is: ``main`` and other branches are not
+affected, and neither are merge queue runs. Stale entries can be removed at any time.
+
+* ``python`` entries are pip requirements, including git URLs (private repositories work
+  with ``private_repos_token``). pip options (``-e``, ``--index-url``, ...) are rejected.
+* ``repos`` only works in geoips, whose CI builds the image (``geoips-site`` target).
+  Plugin repositories test in the published image: use a ``python`` entry such as
+  ``geoips @ git+https://github.com/NRLMMD-GEOIPS/geoips@my-branch`` instead.
+* A repo or ref that does not exist fails the build. Nothing falls back to the default
+  branch.
+* The job summary lists the overrides and what they installed (with commits). Images built
+  with overrides are never pushed.
+
+Manual runs (``workflow_dispatch``) can pass one entry (``python`` and/or ``repos``, not
+keyed by branch) as the ``dependency_overrides`` input instead. Git URLs run code from the
+given branch while the image is built, as the plugin installs already do, with the private
+repos token available (never in fork runs).
+
+This replaces checking out a branch of the same name in every repo
+(``GEOIPS_MODIFIED_BRANCH``).
+
 Self-hosted runner maintenance
 ------------------------------
 
