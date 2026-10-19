@@ -1098,7 +1098,7 @@ jobs:
                 # The image installed the plugins in /packages already. Reinstalling
                 # rebuilds fortran plugins in an isolated build environment, against
                 # fresh clones of their build dependencies, which fails
-                # (lunarref, geoips_debra) and ignores the image's dependency overrides.
+                # (lunarref, geoips_debra) and ignores the dependency overrides of the image.
                 if pip show "$name" >/dev/null 2>&1; then
                   echo "$name is installed in the image"
                 else
