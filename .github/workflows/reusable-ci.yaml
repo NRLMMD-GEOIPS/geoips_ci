@@ -132,6 +132,7 @@ on:
 #         - "xarray==2025.6.1"
 #       repos:    # repos the geoips image clones: repo -> branch, tag or commit
 #         recenter_tc: my-fix
+#         rayleigh: "someone:their-fix"   # owner:ref, from someone's fork of rayleigh
 #   A requested ref that does not exist fails the build. Runs with overrides say so
 #   in the job summary and never push images. Plugin repositories only support
 #   python overrides (their image is not built here).
@@ -368,8 +369,10 @@ jobs:
                   errors.append(f"repos: {name!r} is not a repository name")
               if not isinstance(ref, str):
                   errors.append(f"repos: {name}: quote the ref ({ref!r} is not a string)")
-              elif not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9._/-]*", ref) or ".." in ref:
-                  errors.append(f"repos: {name}: {ref!r} is not a branch, tag or commit")
+              # Optionally owner:ref, for a ref in owner's fork (owner is a GitHub user name).
+              elif (not re.fullmatch(r"(?:[A-Za-z0-9][A-Za-z0-9-]{0,38}:)?[A-Za-z0-9_][A-Za-z0-9._/-]*", ref)
+                    or ".." in ref):
+                  errors.append(f"repos: {name}: {ref!r} is not a branch, tag or commit, or owner:ref")
           if repos and os.environ["IS_PLUGIN"] == "true":
               errors.append(
                   "repos: plugin repositories test in the published geoips image, which"
@@ -1092,7 +1095,15 @@ jobs:
                 fi
                 found_count=$((found_count + 1))
                 echo "::group::Install $name"
-                pip install -e ".[test]" --quiet || pip install -e . --quiet
+                # The image installed the plugins in /packages already. Reinstalling
+                # rebuilds fortran plugins in an isolated build environment, against
+                # fresh clones of their build dependencies, which fails
+                # (lunarref, geoips_debra) and ignores the image's dependency overrides.
+                if pip show "$name" >/dev/null 2>&1; then
+                  echo "$name is installed in the image"
+                else
+                  pip install -e ".[test]" --quiet || pip install -e . --quiet
+                fi
                 create_plugin_registries
                 echo "::endgroup::"
 

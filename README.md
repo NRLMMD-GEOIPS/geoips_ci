@@ -187,6 +187,7 @@ with an entry for its branch in ``.github/ci-dependencies.yaml``:
        - "xarray==2025.6.1"
      repos:    # repos the geoips image clones: repo -> branch, tag or commit
        recenter_tc: my-fix
+       rayleigh: "someone:their-fix"   # owner:ref, a branch in someone's fork
 
 Only the entry of the branch under test applies (the pull request's head branch, or the
 pushed branch), so the file can be merged as is: ``main`` and other branches are not
@@ -197,6 +198,8 @@ affected, and neither are merge queue runs. Stale entries can be removed at any 
 * ``repos`` only works in geoips, whose CI builds the image (``geoips-site`` target).
   Plugin repositories test in the published image: use a ``python`` entry such as
   ``geoips @ git+https://github.com/NRLMMD-GEOIPS/geoips@my-branch`` instead.
+* ``owner:ref`` clones the ref from ``https://github.com/owner/<repo>``, for branches that
+  only exist in a fork. The fork must keep the repo name.
 * A repo or ref that does not exist fails the build. Nothing falls back to the default
   branch.
 * The job summary lists the overrides and what they installed (with commits). Images built
