@@ -1,0 +1,74 @@
+name: Reusable code coverage upload
+
+# Uploads the coverage-report artifact of reusable-ci.yaml (Cobertura XML of the
+# repository under test only, see "CODE COVERAGE" there) to GitHub Code Quality, which
+# comments on the pull request and evaluates the "Restrict code coverage" ruleset rule.
+#
+# A separate job so that only it gets code-quality: write, and on a GitHub-hosted runner
+# (the upload action needs python3 and gh on the runner, and runs no repository code).
+# The caller job must grant the permissions, a called workflow cannot exceed them:
+#
+#   upload-coverage:
+#     needs: integ-test
+#     if: github.event_name == 'pull_request' || github.event_name == 'push'
+#     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-upload-coverage.yaml@main
+#     permissions:
+#       contents: read
+#       code-quality: write
+#
+# Coverage is compared with the default branch, so the caller must also run on pushes
+# to it. Pull requests from forks are skipped by the upload action (their token cannot
+# write); so are merge queue runs.
+
+on:
+  workflow_call:
+    inputs:
+      artifact:
+        description: "Artifact holding coverage.xml (from reusable-ci.yaml)"
+        required: false
+        type: string
+        default: "coverage-report"
+      label:
+        description: "Label of the coverage report in Code Quality"
+        required: false
+        type: string
+        default: "code-coverage/pytest"
+      runner:
+        description: "Runner label for the upload job (no repository code runs there)"
+        required: false
+        type: string
+        default: "ubuntu-latest"
+
+jobs:
+  upload:
+    name: Upload code coverage
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      code-quality: write
+    steps:
+      - name: Download coverage report
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: coverage-report
+
+      - name: Check coverage report
+        env:
+          ARTIFACT: ${{ inputs.artifact }}
+        run: |
+          # A missing report would leave the pull request without coverage: the
+          # "Restrict code coverage" rule does not wait for an upload, so fail here.
+          if [ ! -s coverage-report/coverage.xml ] || [ -L coverage-report/coverage.xml ]; then
+            echo "::error::No coverage.xml in the ${ARTIFACT} artifact (is CI_COVERAGE false?)"
+            exit 1
+          fi
+          head -c 400 coverage-report/coverage.xml; echo
+
+      - name: Upload coverage report
+        uses: actions/upload-code-coverage@v1
+        with:
+          file: coverage-report/coverage.xml
+          language: Python
+          label: ${{ inputs.label }}

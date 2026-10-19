@@ -172,6 +172,74 @@ At the end of the run, the "Test summary" step lists every repository (geoips fi
 each plugin) with ✅ passed, ❌ failed, ⚠️ failed but ignored (``continue_on_*`` inputs)
 or ➖ no tests, in the log and in the job summary.
 
+Code coverage
+-------------
+
+``reusable-ci.yaml`` measures the line coverage of the repository under test, and only of
+it: the package named in its ``pyproject.toml``. In geoips the plugin tests are not
+measured, and in a plugin repository neither is geoips (nor its core unit tests). The
+unit, integration-base and integration-full suites add to one coverage data file, and
+the "Coverage report" step writes:
+
+* the ``coverage-report`` artifact: ``coverage.xml`` (Cobertura, paths relative to the
+  repository root) and an HTML report,
+* the total and a per-file table in the job summary.
+
+Most integration tests run bash scripts that start ``geoips`` in a subprocess. coverage.py
+measures those processes as well (``patch = subprocess``), and the multiprocessing workers
+they start (``patch = _exit``, ``sigterm``). The configuration is written by the "Write
+coverage config" step, so a repository's own coverage settings do not apply in CI. It needs
+coverage 7.10 or later in the image (geoips pins 7.14). Measuring slows the tests down;
+set the ``CI_COVERAGE`` variable to ``false`` to turn it off.
+
+To show coverage on pull requests and enforce thresholds, in each repository that wants
+it:
+
+1. Enable GitHub Code Quality (Settings -> Security -> Code quality).
+2. Upload the report from the caller workflow, in a separate job that grants
+   ``code-quality: write`` to ``reusable-upload-coverage.yaml`` only, and also run the
+   workflow on pushes to the default branch, which is the baseline pull requests are
+   compared with:
+
+   .. code-block:: yaml
+
+      on:
+        pull_request:
+        push:
+          branches: [main]
+      jobs:
+        integ-test:
+          if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+          uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-ci.yaml@main
+          # ...
+        upload-coverage:
+          needs: integ-test
+          if: github.event_name == 'pull_request' || github.event_name == 'push'
+          uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-upload-coverage.yaml@main
+          permissions:
+            contents: read
+            code-quality: write
+
+   ``github-code-quality[bot]`` then comments the coverage of the pull request, compared
+   with the default branch, on every pull request.
+3. Add a **repository** branch ruleset (Settings -> Rules -> Rulesets) with "Restrict code
+   coverage" (minimum line coverage and/or maximum drop in percentage points; 0 disables a
+   threshold) and with the upload job (``upload-coverage / Upload code coverage``) as a
+   required status check: the coverage rule does not wait for uploads. Do not put the
+   coverage rule in an organization ruleset, which would apply the same thresholds to
+   every repository.
+
+Notes:
+
+* Pull requests from forks and manual runs (``workflow_dispatch``) are not uploaded.
+* Runs whose tests failed are not uploaded (``needs`` skips the job): partial coverage would
+  look like a drop.
+* GitHub compares against the default branch (``main``), even for pull requests to another
+  branch (for example ``dev-staging``).
+* The tests run on the pull request's merge commit, and the upload is for its head commit.
+  Line numbers only match where the branch is up to date with its base, which geoips'
+  rulesets require before merging.
+
 Testing against other branches or versions
 ------------------------------------------
 

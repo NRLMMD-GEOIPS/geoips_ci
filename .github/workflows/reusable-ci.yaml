@@ -108,6 +108,7 @@ on:
 #   CI_SHM_SIZE         — /dev/shm size of the test containers (default: 16g)
 #   CI_MIN_FREE_OUTPUT_GB — free space (GB) needed for test outputs in RUNNER_TEMP, or the
 #                         run fails before testing (default: 150)
+#   CI_COVERAGE         — set to "false" to skip measuring code coverage
 #
 # FORK PULL REQUESTS:
 #   For pull_request events whose head repo differs from this repo, the CI job
@@ -143,6 +144,15 @@ on:
 #     synth_green: "install fails, see NRLMMD-GEOIPS/synth_green#12"
 #   The image build skips those repos (DISABLED_REPOS build argument) and the job
 #   summary lists them. Only geoips (whose CI builds the image) supports this file.
+#
+# CODE COVERAGE (only of the repository under test):
+#   The unit and integration tests of this repository measure the coverage of its own
+#   package (PACKAGE_NAME) only, including code run by the bash test scripts in
+#   subprocesses. The plugin tests (in geoips) and the core unit tests (in plugin
+#   repos) are not measured. The combined Cobertura report is the coverage-report
+#   artifact (coverage.xml and an HTML report). reusable-upload-coverage.yaml uploads
+#   it to GitHub Code Quality, from a separate caller job that grants
+#   code-quality: write, see "Code coverage" in the README.
 
 defaults:
   run:
@@ -298,6 +308,43 @@ jobs:
           esac
           echo "PACKAGE_NAME=${PACKAGE_NAME}" >> "$GITHUB_ENV"
           echo "Detected package: ${PACKAGE_NAME}"
+
+      - name: Write coverage config
+        if: ${{ vars.CI_COVERAGE != 'false' }}
+        run: |
+          # See "CODE COVERAGE" at the top. The test steps mount this directory at
+          # /ci-coverage and pass COV_ARGS to pytest.
+          #   source_pkgs: only this repository's package, never plugins or geoips
+          #     itself in a plugin repo (they are installed in the same image).
+          #   patch = subprocess: also measure the Python processes the bash test
+          #     scripts start (geoips run ...), whatever their working directory.
+          #   patch = _exit, sigterm: save the data of multiprocessing workers, which
+          #     end with os._exit or are terminated. Do not add
+          #     concurrency = multiprocessing: with sigterm, pool shutdown can hang.
+          #   data_file: absolute, so every process and every step adds to the same
+          #     data (--cov-append), removed by "Clear old reports".
+          #   [paths]: report code imported from the image's copy or site-packages
+          #     as the workspace's files.
+          cov_dir="${RUNNER_TEMP}/geoips-ci-coverage"
+          mkdir -p "$cov_dir"
+          cat > "$cov_dir/coveragerc" <<EOF
+          [run]
+          source_pkgs = ${PACKAGE_NAME//-/_}
+          patch = _exit, subprocess
+          sigterm = true
+          parallel = true
+          data_file = /workspace/.coverage
+          disable_warnings = no-data-collected, module-not-imported
+
+          [paths]
+          source =
+              /workspace/
+              /packages/${PACKAGE_NAME}/
+              */site-packages/
+          EOF
+          cat "$cov_dir/coveragerc"
+          echo "COVERAGE_DIR=${cov_dir}" >> "$GITHUB_ENV"
+          echo "COV_ARGS=--cov --cov-config=/ci-coverage/coveragerc --cov-append" >> "$GITHUB_ENV"
 
       - name: Read dependency overrides
         env:
@@ -707,11 +754,15 @@ jobs:
           CI_LINT: ${{ vars.CI_LINT }}
           PACKAGE_NAME_ENV: ${{ env.PACKAGE_NAME }}
         run: |
+          # Coverage config, see "Write coverage config".
+          cov_mount=()
+          if [ -n "${COVERAGE_DIR:-}" ]; then cov_mount=(-v "$COVERAGE_DIR":/ci-coverage:ro); fi
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
             --shm-size "$SHM_SIZE" \
             --user root \
             -v "$(pwd)":/workspace -w /workspace \
-            -e CI_LINT -e CI_DEBUG_FAST -e PACKAGE_NAME_ENV -e CURR_REPO -e XDIST_ARGS \
+            "${cov_mount[@]}" \
+            -e CI_LINT -e CI_DEBUG_FAST -e PACKAGE_NAME_ENV -e CURR_REPO -e XDIST_ARGS -e COV_ARGS \
             "$IMAGE_TAG" \
             bash -c '
               git config --global --add safe.directory /workspace
@@ -742,8 +793,9 @@ jobs:
                 run_suite unit -vv $XDIST_ARGS tests/unit_tests \
                   --html=/workspace/test-reports/unit-tests.html \
                   --self-contained-html \
-                  --cov="$PACKAGE_NAME_ENV" \
-                  --cov-report=html:/workspace/test-reports/coverage-unit
+                  $COV_ARGS
+                # The integration tests add to it, maybe as another user (CI_DOCKER_USER).
+                if [ -n "$COV_ARGS" ] && [ -f .coverage ]; then chmod a+rw .coverage; fi
               fi
               exit $rc
             '
@@ -793,15 +845,6 @@ jobs:
         with:
           name: unit-test-report
           path: test-reports/unit-tests.html
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Upload unit test coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-coverage
-          path: test-reports/coverage-unit/
           if-no-files-found: warn
           retention-days: 14
 
@@ -934,6 +977,9 @@ jobs:
           if [ -d "${TESTDATA_PATH}/city_lights" ]; then
             ancil_mount=(-v "${TESTDATA_PATH}/city_lights":/output/ancildat/city_lights:ro)
           fi
+          # Coverage config, see "Write coverage config".
+          cov_mount=()
+          if [ -n "${COVERAGE_DIR:-}" ]; then cov_mount=(-v "$COVERAGE_DIR":/ci-coverage:ro); fi
           docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
             --shm-size "$SHM_SIZE" \
             --user "$DOCKER_USER" \
@@ -941,8 +987,9 @@ jobs:
             -v "$outdirs":/output \
             "${ancil_mount[@]}" \
             -v "$(pwd)":/workspace -w /workspace \
+            "${cov_mount[@]}" \
             -e GEOIPS_TESTDATA_DIR=/geoips_testdata \
-            -e CI_DEBUG_FAST -e PACKAGE_NAME -e CURR_REPO -e XDIST_ARGS \
+            -e CI_DEBUG_FAST -e PACKAGE_NAME -e CURR_REPO -e XDIST_ARGS -e COV_ARGS \
             "$IMAGE_TAG" \
             bash -c '
               git config --global --add safe.directory /workspace
@@ -963,8 +1010,7 @@ jobs:
                 --no-fail-on-missing-data \
                 --html=/workspace/test-reports/integration-base.html \
                 --self-contained-html \
-                --cov="$PACKAGE_NAME" \
-                --cov-report=html:/workspace/test-reports/coverage-integration-base
+                $COV_ARGS
               if [ "$CI_DEBUG_FAST" = "true" ]; then
                 echo "=== Skipping full integration: CI_DEBUG_FAST=true ==="
               else
@@ -977,8 +1023,7 @@ jobs:
                     --no-fail-on-missing-data \
                     --html=/workspace/test-reports/integration-full.html \
                     --self-contained-html \
-                    --cov="$PACKAGE_NAME" \
-                    --cov-report=html:/workspace/test-reports/coverage-integration-full
+                    $COV_ARGS
                 fi
               fi
               exit $rc
@@ -1098,7 +1143,7 @@ jobs:
                 # The image installed the plugins in /packages already. Reinstalling
                 # rebuilds fortran plugins in an isolated build environment, against
                 # fresh clones of their build dependencies, which fails
-                # (lunarref, geoips_debra) and ignores the image's dependency overrides.
+                # (lunarref, geoips_debra) and ignores the dependency overrides of the image.
                 if pip show "$name" >/dev/null 2>&1; then
                   echo "$name is installed in the image"
                 else
@@ -1148,6 +1193,49 @@ jobs:
               echo "::endgroup::"
             '
 
+      - name: Coverage report
+        # After the plugin tests only so that it is in the same place in every run: they
+        # are not measured. Data from unit tests alone (CI_INTEGRATION=false, or a failed
+        # integration step) is still reported.
+        if: ${{ !cancelled() && steps.smoke.outcome == 'success' && vars.CI_COVERAGE != 'false' }}
+        run: |
+          # .coverage, or .coverage.<host>.<pid>.<random> files not combined yet
+          if [ ! -e .coverage ] && ! compgen -G ".coverage.*" >/dev/null; then
+            echo "::warning::No coverage data was collected (no unit or integration tests ran?)"
+            exit 0
+          fi
+          docker run --rm --label geoips-ci=true --label "$CI_RUN_LABEL" \
+            --user root \
+            -v "$COVERAGE_DIR":/ci-coverage:ro \
+            -v "$(pwd)":/workspace -w /workspace \
+            "$IMAGE_TAG" \
+            bash -c '
+              set -e
+              rc=/ci-coverage/coveragerc
+              # Data a killed pytest run (timeout) did not combine. Fails when there
+              # is nothing to combine.
+              coverage combine --append --rcfile=$rc >/dev/null 2>&1 || true
+              mkdir -p test-reports
+              # Paths in the XML are relative to the repository root, as GitHub needs.
+              coverage xml --rcfile=$rc -i -o test-reports/coverage.xml
+              coverage html --rcfile=$rc -i -d test-reports/coverage-html
+              coverage report --rcfile=$rc -i --format=markdown > test-reports/coverage-summary.md
+              coverage report --rcfile=$rc -i --format=total > test-reports/coverage-total.txt
+            '
+          total=$(cat test-reports/coverage-total.txt)
+          echo "Line coverage of ${PACKAGE_NAME}: ${total}%"
+          {
+            echo "## Code coverage"
+            echo ""
+            echo "Line coverage of \`${PACKAGE_NAME}\` (unit and integration tests of ${CURR_REPO}): **${total}%**"
+            echo ""
+            echo "<details><summary>Coverage by file</summary>"
+            echo ""
+            cat test-reports/coverage-summary.md
+            echo "</details>"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Drop symlinks from test reports (integration)
         if: always()
         # Written by test code inside containers: do not let artifact uploads follow
@@ -1167,8 +1255,18 @@ jobs:
             test-reports/*-integration-full.html
             test-reports/*-unit-tests*.html
             test-reports/plugin-summary.md
-            test-reports/coverage-integration-base/
-            test-reports/coverage-integration-full/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload coverage report
+        # Uploaded to GitHub Code Quality by reusable-upload-coverage.yaml.
+        if: ${{ vars.CI_COVERAGE != 'false' && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            test-reports/coverage.xml
+            test-reports/coverage-html/
           if-no-files-found: warn
           retention-days: 14
 

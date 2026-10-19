@@ -1,0 +1,28 @@
+continuous integration:
+- title: 'Code coverage of the repository under test, with integration tests'
+  description: |
+    ``reusable-ci.yaml`` measures the line coverage of the repository under test
+    only (its own package: not the plugins in geoips, not geoips in a plugin
+    repository) over its unit, integration-base and integration-full tests,
+    including the ``geoips`` processes the bash test scripts start
+    (coverage.py ``patch = subprocess``). The combined Cobertura report and an
+    HTML report are the ``coverage-report`` artifact, and the job summary shows
+    the total. ``CI_COVERAGE=false`` turns it off. The new
+    ``reusable-upload-coverage.yaml`` uploads the report to GitHub Code Quality
+    from a separate job with ``code-quality: write``, for pull request coverage
+    comments and the "Restrict code coverage" ruleset rule. The per-suite
+    ``unit-test-coverage`` artifact and HTML reports are replaced by the
+    combined report.
+  files:
+    added:
+    - '.github/workflows/reusable-upload-coverage.yaml'
+    - 'docs/source/releases/latest/integration-test-coverage.yaml'
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+    - 'README.md'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-19
+    finish: 2026-10-19
