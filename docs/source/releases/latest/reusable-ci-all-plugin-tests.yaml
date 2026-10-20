@@ -26,7 +26,7 @@ continuous integration:
     instead of the copy of the plugin baked into the image.
 
     The Fortran plugins' ancillary datasets (city_lights, elevation, lunarref,
-    lw_mask, rayleigh and synth_green) are mounted from the test data at
+    lw_mask, merra, rayleigh and synth_green) are mounted from the test data at
     ``/output/ancildat``, where the compiled plugins look for them. Previously
     only city_lights was.
 
