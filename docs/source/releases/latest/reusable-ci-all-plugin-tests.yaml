@@ -24,6 +24,11 @@ continuous integration:
     that calls ``reusable-ci.yaml`` with ``run_core_tests: true``, so a pull
     request to a plugin repository is tested against the pull request branch
     instead of the copy of the plugin baked into the image.
+
+    The Fortran plugins' ancillary datasets (city_lights, elevation, lunarref,
+    lw_mask, rayleigh and synth_green) are mounted from the test data at
+    ``/output/ancildat``, where the compiled plugins look for them. Previously
+    only city_lights was.
   files:
     modified:
     - '.github/workflows/reusable-ci.yaml'
