@@ -29,6 +29,12 @@ continuous integration:
     lw_mask, rayleigh and synth_green) are mounted from the test data at
     ``/output/ancildat``, where the compiled plugins look for them. Previously
     only city_lights was.
+
+    When a plugin integration test has bad comparisons, the integration-reports
+    artifact holds the new outputs under ``badcompares/<plugin>/``, at the
+    comparison path they would replace, with the diff images. Updating the
+    comparison files no longer needs a local run. Private plugins are left out
+    when their output is quiet.
   files:
     modified:
     - '.github/workflows/reusable-ci.yaml'

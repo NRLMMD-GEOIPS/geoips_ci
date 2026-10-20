@@ -1069,6 +1069,27 @@ jobs:
                 echo "::endgroup::"
               }
 
+              # save_badcompares <plugin>: keep the outputs that did not match the
+              # plugin comparison files, at the path they would replace, plus the diff
+              # images, under test-reports/badcompares/<plugin>/. GeoIPS writes one
+              # "cp -v <output> <comparison dir>" line per bad comparison to the
+              # cp_BADCOMPARES.txt in each diff directory.
+              save_badcompares() {
+                local name="$1" list diffdir line src dest out
+                for list in $(find "/packages/$name/tests/outputs" -name cp_BADCOMPARES.txt 2>/dev/null); do
+                  diffdir=$(dirname "$list")
+                  out="/workspace/test-reports/badcompares/$name/${diffdir#/packages/$name/}"
+                  mkdir -p "$out" && cp -r "$diffdir"/. "$out"/
+                  while read -r line; do
+                    read -r -a w <<< "$line"
+                    [ "${w[0]}" = "cp" ] && [ "${#w[@]}" -ge 3 ] || continue
+                    src="${w[${#w[@]}-2]}"; dest="${w[${#w[@]}-1]}"
+                    dest="/workspace/test-reports/badcompares/$name/$(realpath -m --relative-to="/packages/$name" "$dest")"
+                    mkdir -p "$dest" && cp "$src" "$dest"/ || true
+                  done < "$list"
+                done
+              }
+
               for pkg_dir in /packages/*/; do
                 name=$(basename "$pkg_dir")
                 [ "$name" = "geoips" ] && continue
@@ -1134,6 +1155,8 @@ jobs:
                       tests/integration_tests/test_*.py --no-fail-on-missing-data \
                       $(html_args "$name-integration-full.html")
                   fi
+                  # Private plugin outputs stay out of the artifacts of a public repository.
+                  [ "$quiet" = true ] || save_badcompares "$name"
                 fi
               done
               echo ""
@@ -1175,6 +1198,7 @@ jobs:
             test-reports/plugin-summary.md
             test-reports/coverage-integration-base/
             test-reports/coverage-integration-full/
+            test-reports/badcompares/
           if-no-files-found: warn
           retention-days: 14
 
