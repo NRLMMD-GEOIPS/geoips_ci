@@ -44,12 +44,13 @@ env:
 
   # The path to the GeoIPS package in DOCLINTTEST images
   BASE_GEOIPS_PATH: /packages/geoips
-  # Use the latest tag so we are using the most up to date functional version of the
-  # geoips docker image for the plugin repo CI.
+  # The shared image, for every run that does not build its own: plugin repos and
+  # geoips pull requests from forks. Use the latest tag so we are using the most up
+  # to date functional version of the geoips docker image.
   # * latest is built on every push to the default branch
   # * stable is built on every tag/release
   # * working is built on every push to a geoips PR.
-  PLUGIN_DOCLINTTEST_TAG: doclinttest-latest
+  SHARED_DOCLINTTEST_TAG: doclinttest-latest
 
 defaults:
   run:
@@ -101,18 +102,23 @@ jobs:
         id: set_doclinttest_tag
         run: |
           echo "CURR_REPO: ${CURR_REPO}"
-          # If the current repository is geoips, use the image we're about to build
-          # for running tests and building docs. Fork pull requests cannot push
-          # that image, so they fall through to the shared latest image.
           if [[ "${CURR_REPO}" == "geoips" && "${IS_FORK}" != "true" ]]; then
-              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}"
-              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}" >> "$GITHUB_ENV"
-              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+              # geoips: use the image we're about to build for running tests and
+              # building docs.
+              tag="doclinttest-${GITHUB_SHA}"
+          elif [[ "${CURR_REPO}" == "geoips" ]]; then
+              # geoips pull request from a fork: build_doclinttest_image does not
+              # run (no registry credentials, and the push would publish a
+              # fork-built image), so use the shared image. The doc-test jobs
+              # install the fork's checkout into it, as for plugin repos.
+              tag="${SHARED_DOCLINTTEST_TAG}"
           else
-              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}"
-              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}" >> "$GITHUB_ENV"
-              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}" >> "$GITHUB_OUTPUT"
+              # Plugin repos: the shared image.
+              tag="${SHARED_DOCLINTTEST_TAG}"
           fi
+          echo "DOCLINTTEST_TAG=${tag}"
+          echo "DOCLINTTEST_TAG=${tag}" >> "$GITHUB_ENV"
+          echo "DOCLINTTEST_TAG=${tag}" >> "$GITHUB_OUTPUT"
       - name: Set doclinttest image
         id: set_doclinttest_image
         run: |
