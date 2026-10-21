@@ -3,6 +3,14 @@ name: Run linters
 on:
   # Reusable workflow
   workflow_call:
+    inputs:
+      fork_approval_environment:
+        description: >
+          GitHub Environment (with required reviewers) that must approve a run
+          before pull requests from forks may execute on the self-hosted runner
+        required: false
+        type: string
+        default: "fork-approval"
     secrets:
       token:
         required: true
@@ -29,8 +37,18 @@ defaults:
     shell: bash
 
 jobs:
+  # Fork pull requests wait here for approval by a required reviewer, see
+  # reusable-fork-gate.yaml. Every job below depends on this gate.
+  fork-gate:
+    name: Fork approval gate
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-fork-gate.yaml@main
+    with:
+      environment: ${{ inputs.fork_approval_environment }}
+
   # Set variables that should be accessible to all jobs
   get-job-flags:
+    needs: [fork-gate]
+    if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
     runs-on: ${{ vars.RUNNER }}
     env:
       CURR_REPO: ${{ github.event.repository.name }}
@@ -59,18 +77,25 @@ jobs:
               # Check if the secret value is "true" and set the environment variable and output
               if [ "$val" == "false" ]; then
                   echo "${flag}=false"
-                  echo "${flag}=false" >> $GITHUB_ENV
-                  echo "${flag}=false" >> $GITHUB_OUTPUT
+                  echo "${flag}=false" >> "$GITHUB_ENV"
+                  echo "${flag}=false" >> "$GITHUB_OUTPUT"
               else
                   echo "${flag}=true"
-                  echo "${flag}=true" >> $GITHUB_ENV
-                  echo "${flag}=true" >> $GITHUB_OUTPUT
+                  echo "${flag}=true" >> "$GITHUB_ENV"
+                  echo "${flag}=true" >> "$GITHUB_OUTPUT"
               fi
           done
 
+  check-release-branch:
+    name: Check release branch
+    needs: [fork-gate]
+    if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-check-release-branch.yaml@main
+
   print-variables:
     name: Print variables
-    needs: [get-job-flags]
+    needs: [fork-gate, check-release-branch, get-job-flags]
+    if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
     with:
       # These are outputs defined in the check-release-branch and get-versions
@@ -84,7 +109,8 @@ jobs:
 
   run_linters:
     runs-on: ${{ vars.RUNNER_PYTHON || vars.RUNNER }}
-    needs: [get-job-flags]
+    needs: [fork-gate, get-job-flags]
+    if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
     steps:
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -111,8 +137,8 @@ jobs:
           clean: true
       - name: List cloned directory
         run: |
-          echo $PWD
-          ls -l $PWD/*
+          echo "$PWD"
+          ls -l "$PWD"/*
       - name: Install black
         if: ${{ needs.get-job-flags.outputs.CI_LINT_BLACK == 'true' }}
         run: pip install black

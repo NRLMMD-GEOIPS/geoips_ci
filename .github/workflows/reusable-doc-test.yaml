@@ -3,11 +3,20 @@ name: Build docs and test
 on:
   # Reusable workflow
   workflow_call:
+    inputs:
+      fork_approval_environment:
+        description: >
+          GitHub Environment (with required reviewers) that must approve a run
+          before pull requests from forks may execute on the self-hosted runner
+        required: false
+        type: string
+        default: "fork-approval"
     secrets:
       token:
         required: true
+      # Not available to pull requests from forks, so it cannot be required.
       docker_token:
-        required: true
+        required: false
 
 # Assuming the below is in the workflow for an individual repository.
 # on:
@@ -25,6 +34,14 @@ defaults:
     shell: bash
 
 jobs:
+  # Fork pull requests wait here for approval by a required reviewer, see
+  # reusable-fork-gate.yaml. Every job below depends on this gate.
+  fork-gate:
+    name: Fork approval gate
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-fork-gate.yaml@main
+    with:
+      environment: ${{ inputs.fork_approval_environment }}
+
   # Build the base GeoIPS doclinttest image
   # This image is used in all subsequent tests
   # It is only built for the main GeoIPS package but is used by all repositories
@@ -37,6 +54,8 @@ jobs:
   # by including it in the "outputs" listed at the top of the workflow.
   get-doclinttest-image:
     name: Get docker image
+    needs: [fork-gate]
+    if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
     # You do not appear to be able to use variables in this "uses" field.
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-build-docker-image.yaml@main
     secrets:
@@ -49,7 +68,8 @@ jobs:
   # Set variables that should be accessible to all jobs
   get-job-flags:
     runs-on: ${{ vars.RUNNER }}
-    needs: [get-doclinttest-image]
+    needs: [fork-gate, get-doclinttest-image]
+    if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
     env:
       CURR_REPO: ${{ github.event.repository.name }}
     outputs:
@@ -82,21 +102,22 @@ jobs:
               # Check if the secret value is "true" and set the environment variable and output
               if [ "$val" == "false" ]; then
                   echo "${flag}=false"
-                  echo "${flag}=false" >> $GITHUB_ENV
-                  echo "${flag}=false" >> $GITHUB_OUTPUT
+                  echo "${flag}=false" >> "$GITHUB_ENV"
+                  echo "${flag}=false" >> "$GITHUB_OUTPUT"
               else
                   echo "${flag}=true"
-                  echo "${flag}=true" >> $GITHUB_ENV
-                  echo "${flag}=true" >> $GITHUB_OUTPUT
+                  echo "${flag}=true" >> "$GITHUB_ENV"
+                  echo "${flag}=true" >> "$GITHUB_OUTPUT"
               fi
           done
           echo "DOCKER_IMAGE_NAME=${DOCKER_IMAGE_NAME}"
-          echo "DOCKER_IMAGE_NAME=${DOCKER_IMAGE_NAME}" >> ${GITHUB_ENV}
-          echo "DOCKER_IMAGE_NAME=${DOCKER_IMAGE_NAME}" >> ${GITHUB_OUTPUT}
+          echo "DOCKER_IMAGE_NAME=${DOCKER_IMAGE_NAME}" >> "$GITHUB_ENV"
+          echo "DOCKER_IMAGE_NAME=${DOCKER_IMAGE_NAME}" >> "$GITHUB_OUTPUT"
 
   print-doc-test-variables:
     name: Print doc-test variables
-    needs: [get-job-flags]
+    needs: [fork-gate, get-job-flags]
+    if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
     # You do not appear to be able to use variables in this "uses" field.
     uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
     with:
@@ -113,12 +134,13 @@ jobs:
   docker_build_sphinx_html:
     if: >
       ! cancelled() &&
+      needs.fork-gate.outputs.allowed == 'true' &&
       needs.get-job-flags.outputs.CI_BUILD_SPHINX_HTML == 'true' &&
       (needs.get-doclinttest-image.result == 'success' ||
       needs.get-doclinttest-image.result == 'skipped')
     # runs-on: ${{ fromJSON(vars.RUNNER_DOCKERRUN) || vars.RUNNER }}
     runs-on: ${{ vars.RUNNER }}
-    needs: [get-doclinttest-image, get-job-flags]
+    needs: [fork-gate, get-doclinttest-image, get-job-flags]
     container:
       image: ${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}
     env:
@@ -128,7 +150,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Configure Git safe directory
-        run: git config --global --add safe.directory $PWD
+        run: git config --global --add safe.directory "$PWD"
 
       - name: Install package
         run: pip install .
@@ -151,17 +173,17 @@ jobs:
           #   the name of the current repo,
           #   "html_only" to indicate producing only html output, and
           #   the path to the docs template directory in the geoips default branch.
-          python3 $BASE_GEOIPS_PATH/docs/build_docs.py \
-            --geoips-docs-path $BASE_GEOIPS_PATH/docs/ \
+          python3 "$BASE_GEOIPS_PATH/docs/build_docs.py" \
+            --geoips-docs-path "$BASE_GEOIPS_PATH/docs/" \
             --force \
             --repo-path . \
-            $run_on_package
+            "$run_on_package"
           ret=$?
           if [[ "${ret##*:}" != *"0"* ]]; then
             echo "::error::Building html docs ${ret##*:}"
             exit 1
           fi
-          echo "BUILT_DOCS_PATH=$PWD/build/sphinx/html" >> $GITHUB_OUTPUT
+          echo "BUILT_DOCS_PATH=$PWD/build/sphinx/html" >> "$GITHUB_OUTPUT"
       - name: Upload HTML Docs
         if: ${{ vars.UPLOAD_GITHUB_ARTIFACTS == 'true' }}
         uses: actions/upload-artifact@v7
@@ -169,6 +191,12 @@ jobs:
           name: HTML Docs
           path: ${{ steps.build-html-docs.outputs.BUILT_DOCS_PATH }}
           if-no-files-found: error
+      - name: Remove fork workspace
+        # Fork code ran in this job with the workspace mounted: leave nothing (git
+        # hooks, .git/config, untracked files) for later jobs of this repository.
+        if: ${{ always() && needs.fork-gate.outputs.is_fork == 'true' }}
+        # ${GITHUB_WORKSPACE:?} aborts instead of expanding to "/*" if it were ever empty.
+        run: rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.[!.]* "${GITHUB_WORKSPACE:?}"/..?* || true
 
   #################################################
   # Code tests - requires pip installed geoips, so use container
@@ -176,26 +204,27 @@ jobs:
   docker_test_interfaces:
     if: >
       ! cancelled() &&
+      needs.fork-gate.outputs.allowed == 'true' &&
       needs.get-job-flags.outputs.CI_TEST_INTERFACES == 'true' &&
       (needs.get-doclinttest-image.result == 'success' ||
       needs.get-doclinttest-image.result == 'skipped')
     # runs-on: ${{ fromJSON(vars.RUNNER_DOCKERRUN) || vars.RUNNER }}
     runs-on: ${{ vars.RUNNER }}
-    needs: [get-doclinttest-image, get-job-flags]
+    needs: [fork-gate, get-doclinttest-image, get-job-flags]
     container:
       image: ${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
       - name: Configure Git safe directory
-        run: git config --global --add safe.directory $PWD
+        run: git config --global --add safe.directory "$PWD"
       - name: Pip install package
         run: pip install -v -e .
       - name: geoips config create-registries
         run: geoips config create-registries
       - name: Run code check script interfaces
         run: |
-          python $BASE_GEOIPS_PATH/tests/utils/test_interfaces.py
+          python "$BASE_GEOIPS_PATH/tests/utils/test_interfaces.py"
           ret=$?
           echo "::group::interface_analysis"
           echo "INTERFACES analysis of code"
@@ -205,16 +234,23 @@ jobs:
             echo "::error::due to interface violations ${ret##*:}"
             exit 1
           fi
+      - name: Remove fork workspace
+        # Fork code ran in this job with the workspace mounted: leave nothing (git
+        # hooks, .git/config, untracked files) for later jobs of this repository.
+        if: ${{ always() && needs.fork-gate.outputs.is_fork == 'true' }}
+        # ${GITHUB_WORKSPACE:?} aborts instead of expanding to "/*" if it were ever empty.
+        run: rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.[!.]* "${GITHUB_WORKSPACE:?}"/..?* || true
 
   docker_test_pytest_short:
     if: >
       ! cancelled() &&
+      needs.fork-gate.outputs.allowed == 'true' &&
       needs.get-job-flags.outputs.CI_TEST_PYTEST_SHORT == 'true' &&
       (needs.get-doclinttest-image.result == 'success' ||
       needs.get-doclinttest-image.result == 'skipped')
     # runs-on: ${{ fromJSON(vars.RUNNER_DOCKERRUN) || vars.RUNNER }}
     runs-on: ${{ vars.RUNNER }}
-    needs: [get-doclinttest-image, get-job-flags]
+    needs: [fork-gate, get-doclinttest-image, get-job-flags]
     container:
       image: ${{ needs.get-job-flags.outputs.DOCKER_IMAGE_NAME }}
     env:
@@ -223,7 +259,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
       - name: Configure Git safe directory
-        run: git config --global --add safe.directory $PWD
+        run: git config --global --add safe.directory "$PWD"
       - name: Pip install package
         run: pip install -v -e .
       - name: geoips config create-registries
@@ -256,7 +292,7 @@ jobs:
           echo "which pytest"
           which pytest
           echo "pytest -q $BASE_GEOIPS_PATH/tests/unit_tests"
-          pytest -q $BASE_GEOIPS_PATH/tests/unit_tests
+          pytest -q "$BASE_GEOIPS_PATH/tests/unit_tests"
           ret=$?
           echo "Return code: ${ret}"
           echo "::endgroup::"
@@ -264,3 +300,9 @@ jobs:
             echo "::error::due to geoips repo pytest errors, return code ${ret}"
             exit 1
           fi
+      - name: Remove fork workspace
+        # Fork code ran in this job with the workspace mounted: leave nothing (git
+        # hooks, .git/config, untracked files) for later jobs of this repository.
+        if: ${{ always() && needs.fork-gate.outputs.is_fork == 'true' }}
+        # ${GITHUB_WORKSPACE:?} aborts instead of expanding to "/*" if it were ever empty.
+        run: rm -rf "${GITHUB_WORKSPACE:?}"/* "${GITHUB_WORKSPACE:?}"/.[!.]* "${GITHUB_WORKSPACE:?}"/..?* || true
