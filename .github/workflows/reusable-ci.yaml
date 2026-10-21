@@ -461,6 +461,10 @@ jobs:
           PYTEST_WORKERS: ${{ vars.CI_PYTEST_WORKERS || '16' }}
           SHM_SIZE: ${{ vars.CI_SHM_SIZE || '16g' }}
         run: |
+          # Strip newlines, in a form CodeQL recognizes: the checks below already
+          # reject them, but an unrecognized check is reported as env injection.
+          PYTEST_WORKERS="$(printf '%s' "$PYTEST_WORKERS" | tr -d '\r\n')"
+          SHM_SIZE="$(printf '%s' "$SHM_SIZE" | tr -d '\r\n')"
           case "$PYTEST_WORKERS" in
             ''|*[!0-9]*)
               echo "::error::CI_PYTEST_WORKERS must be a whole number"
