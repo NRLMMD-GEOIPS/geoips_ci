@@ -41,7 +41,7 @@ jobs:
   # reusable-fork-gate.yaml. Every job below depends on this gate.
   fork-gate:
     name: Fork approval gate
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-fork-gate.yaml@main
+    uses: ./.github/workflows/reusable-fork-gate.yaml
     with:
       environment: ${{ inputs.fork_approval_environment }}
 
@@ -90,13 +90,13 @@ jobs:
     name: Check release branch
     needs: [fork-gate]
     if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-check-release-branch.yaml@main
+    uses: ./.github/workflows/reusable-check-release-branch.yaml
 
   print-variables:
     name: Print variables
     needs: [fork-gate, check-release-branch, get-job-flags]
     if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
+    uses: ./.github/workflows/reusable-print-variables.yaml
     with:
       # These are outputs defined in the check-release-branch and get-versions
       # reusable workflows.  Explicitly pass them in here to track what
