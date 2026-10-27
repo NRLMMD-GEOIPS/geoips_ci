@@ -154,7 +154,7 @@ jobs:
   # unless needs.fork-gate.outputs.allowed == 'true'.
   fork-gate:
     name: Fork approval gate
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-fork-gate.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-fork-gate.yaml@main
     with:
       environment: ${{ inputs.fork_approval_environment }}
 
