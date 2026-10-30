@@ -1,0 +1,23 @@
+bug fix:
+- title: 'Restore full reusable workflow references in the ruleset workflows'
+  description: |
+    The ``ruleset-*.yaml`` workflows called their reusable workflows with local
+    ``./.github/workflows/...`` paths. Organization rulesets run these workflows
+    in the repository of the pull request, so the local paths pointed at files
+    that do not exist there. Every ruleset check failed to start, with no jobs.
+    They now call ``NRLMMD-GEOIPS/geoips_ci/.github/workflows/...`` pinned to a
+    commit SHA of geoips_ci main, because CodeQL (``actions/unpinned-tag``)
+    rejects unpinned ``@main`` references.
+  files:
+    modified:
+    - '.github/workflows/ruleset-doc-test.yaml'
+    - '.github/workflows/ruleset-lint.yaml'
+    - '.github/workflows/ruleset-pr-check-boxes-complete.yaml'
+    - '.github/workflows/ruleset-proper-release-note-edits.yaml'
+    - '.github/workflows/ruleset-proper-rst-documentation-edits.yaml'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-30
+    finish: 2026-10-30
