@@ -85,11 +85,9 @@ jobs:
     # !cancelled() rather than always(): a cancelled run must not proceed.
     # If this job does not run, `allowed` is empty and every consumer skips.
     if: ${{ !cancelled() }}
-    # TEMPORARY (GitHub Actions incident 2026-10-05, hosted runners not assigned):
-    # on self-hosted so runs are not stuck here. It checks nothing out and runs no
-    # code from the pull request, but does run before approval is decided. Revert to
-    # ubuntu-latest once the incident is over.
-    runs-on: self-hosted
+    # GitHub-hosted, like the approval job: it runs before approval is decided, so
+    # it must not use the self-hosted runner.
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
     outputs:

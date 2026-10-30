@@ -1,0 +1,23 @@
+bug fix:
+- title: 'Run the fork approval gate result job on GitHub-hosted runners'
+  description: |
+    The ``result`` job of ``reusable-fork-gate.yaml`` was moved to
+    ``self-hosted`` during the 2026-10-05 GitHub Actions incident. It runs
+    before approval is decided, so it is back on ``ubuntu-latest``, like the
+    ``approval`` job.
+    The ruleset workflows are pinned to the commit with this change, so their
+    nested fork gate calls use it.
+  files:
+    modified:
+    - '.github/workflows/reusable-fork-gate.yaml'
+    - '.github/workflows/ruleset-doc-test.yaml'
+    - '.github/workflows/ruleset-lint.yaml'
+    - '.github/workflows/ruleset-pr-check-boxes-complete.yaml'
+    - '.github/workflows/ruleset-proper-release-note-edits.yaml'
+    - '.github/workflows/ruleset-proper-rst-documentation-edits.yaml'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-30
+    finish: 2026-10-30
