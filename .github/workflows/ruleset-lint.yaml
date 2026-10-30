@@ -19,7 +19,9 @@ jobs:
   lint:
     name: Lint
     # You do not appear to be able to use variables in the "uses" field.
-    uses: ./.github/workflows/reusable-lint.yaml
+    # Keep the full owner/repo path and @ref: rulesets run this workflow in the
+    # pull request's repository, where ./.github/workflows paths do not exist.
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-lint.yaml@main
     # Only runs if the pull request is NOT a draft and this is not a test data repo
     if: >-
       github.event.pull_request.draft == false &&
@@ -33,7 +35,9 @@ jobs:
     if: github.event.pull_request.draft == false
     name: Spell Check Changed Files
     # You do not appear to be able to use variables in the "uses" field.
-    uses: ./.github/workflows/reusable-cspell-spell-checking.yaml
+    # Keep the full owner/repo path and @ref: rulesets run this workflow in the
+    # pull request's repository, where ./.github/workflows paths do not exist.
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-cspell-spell-checking.yaml@main
     permissions:
       contents: read
       pull-requests: read

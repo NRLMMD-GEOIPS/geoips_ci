@@ -38,7 +38,9 @@ jobs:
   doctest:
     name: Doctest
     # You do not appear to be able to use variables in the "uses" field.
-    uses: ./.github/workflows/reusable-doc-test.yaml
+    # Keep the full owner/repo path and @ref: rulesets run this workflow in the
+    # pull request's repository, where ./.github/workflows paths do not exist.
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-doc-test.yaml@main
     # Do not run doc-test on geoips_ci, .github, or test_data repos.  These repos
     # are not pip installable, so do not attempt to run.
     # Also never run CI on draft pull requests.
