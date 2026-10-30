@@ -6,9 +6,8 @@ on:
     secrets:
       token:
         required: true
-      # Not available to pull requests from forks, so it cannot be required.
       docker_token:
-        required: false
+        required: true
     outputs:
       DOCKER_IMAGE_NAME:
         description: "Name of docker image to be used"
@@ -44,13 +43,12 @@ env:
 
   # The path to the GeoIPS package in DOCLINTTEST images
   BASE_GEOIPS_PATH: /packages/geoips
-  # The shared image, for every run that does not build its own: plugin repos and
-  # geoips pull requests from forks. Use the latest tag so we are using the most up
-  # to date functional version of the geoips docker image.
+  # Use the latest tag so we are using the most up to date functional version of the
+  # geoips docker image for the plugin repo CI.
   # * latest is built on every push to the default branch
   # * stable is built on every tag/release
   # * working is built on every push to a geoips PR.
-  SHARED_DOCLINTTEST_TAG: doclinttest-latest
+  PLUGIN_DOCLINTTEST_TAG: doclinttest-latest
 
 defaults:
   run:
@@ -62,9 +60,6 @@ jobs:
     runs-on: ${{ vars.RUNNER }}
     env:
       CURR_REPO: ${{ github.event.repository.name }}
-      # Pull requests from forks have no registry credentials and cannot push
-      # the per-commit image, so they use the same image as plugin repos.
-      IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
       DOCKER_REGISTRY_USER: ${{ vars.DOCKER_REGISTRY_USER }}
       REPO_OWNER: ${{ github.repository_owner }}
     outputs:
@@ -96,41 +91,36 @@ jobs:
           image_name="${image_name,,}"
 
           echo "IMAGE_NAME=${image_name}"
-          echo "IMAGE_NAME=${image_name}" >> "$GITHUB_ENV"
-          echo "IMAGE_NAME=${image_name}" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_NAME=${image_name}" >> ${GITHUB_ENV}
+          echo "IMAGE_NAME=${image_name}" >> ${GITHUB_OUTPUT}
       - name: Set doclinttest image tag
         id: set_doclinttest_tag
         run: |
           echo "CURR_REPO: ${CURR_REPO}"
-          if [[ "${CURR_REPO}" == "geoips" && "${IS_FORK}" != "true" ]]; then
-              # geoips: use the image we're about to build for running tests and
-              # building docs.
-              tag="doclinttest-${GITHUB_SHA}"
-          elif [[ "${CURR_REPO}" == "geoips" ]]; then
-              # geoips pull request from a fork: build_doclinttest_image does not
-              # run (no registry credentials, and the push would publish a
-              # fork-built image), so use the shared image. The doc-test jobs
-              # install the fork's checkout into it, as for plugin repos.
-              tag="${SHARED_DOCLINTTEST_TAG}"
+          # If the current repository is geoips, use the image we're about to build
+          # for running tests and building docs.
+          if [[ "${CURR_REPO}" == "geoips" ]]; then
+              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}"
+              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}" >> ${GITHUB_ENV}
+              echo "DOCLINTTEST_TAG=doclinttest-${GITHUB_SHA}" >> ${GITHUB_OUTPUT}
           else
-              # Plugin repos: the shared image.
-              tag="${SHARED_DOCLINTTEST_TAG}"
+              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}"
+              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}" >> ${GITHUB_ENV}
+              echo "DOCLINTTEST_TAG=${PLUGIN_DOCLINTTEST_TAG}" >> ${GITHUB_OUTPUT}
           fi
-          echo "DOCLINTTEST_TAG=${tag}"
-          echo "DOCLINTTEST_TAG=${tag}" >> "$GITHUB_ENV"
-          echo "DOCLINTTEST_TAG=${tag}" >> "$GITHUB_OUTPUT"
       - name: Set doclinttest image
         id: set_doclinttest_image
         run: |
+          doclinttest_image_name=${IMAGE_NAME}:${DOCLINTTEST_TAG}
           echo "DOCLINTTEST_IMAGE=${IMAGE_NAME}:${DOCLINTTEST_TAG}"
-          echo "DOCLINTTEST_IMAGE=${IMAGE_NAME}:${DOCLINTTEST_TAG}" >> "$GITHUB_ENV"
-          echo "DOCLINTTEST_IMAGE=${IMAGE_NAME}:${DOCLINTTEST_TAG}" >> "$GITHUB_OUTPUT"
+          echo "DOCLINTTEST_IMAGE=${IMAGE_NAME}:${DOCLINTTEST_TAG}" >> ${GITHUB_ENV}
+          echo "DOCLINTTEST_IMAGE=${IMAGE_NAME}:${DOCLINTTEST_TAG}" >> ${GITHUB_OUTPUT}
 
   print-build-image-variables:
     name: Print build image variables
     needs: [get-job-flags]
     # You do not appear to be able to use variables in this "uses" field.
-    uses: ./.github/workflows/reusable-print-variables.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
     with:
       # These are outputs defined above.  Explicitly pass them in here to track
       # what variables we have available to this workflow.
@@ -149,12 +139,9 @@ jobs:
     # runs-on: ${{ fromJSON(vars.RUNNER_DOCKERRUN || vars.RUNNER) }}
     runs-on: ${{ vars.RUNNER }}
     needs: get-job-flags
-    # Never for fork pull requests: no registry credentials, and the push would
-    # publish fork-built images under this repository's tags.
     if: >
       ! cancelled() &&
-      github.event.repository.name == 'geoips' &&
-      !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository)
+      github.event.repository.name == 'geoips'
     env:
       IMAGE_NAME: ${{ needs.get-job-flags.outputs.IMAGE_NAME }}
       BUILDCACHE_IMAGE: ${{ needs.get-job-flags.outputs.IMAGE_NAME }}:buildcache
@@ -219,7 +206,7 @@ jobs:
           fi
           # PUSH_TAGS is used with the docker buildx action
           echo "PUSH_TAGS=${tags}"
-          echo "PUSH_TAGS=${tags}" >> "$GITHUB_ENV"
+          echo "PUSH_TAGS=${tags}" >> $GITHUB_ENV
 
       - name: Build and push docker image with docker buildx action
         # References the below commit, which matched both v6 and v6.12.0 at the time

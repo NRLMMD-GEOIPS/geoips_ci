@@ -21,7 +21,7 @@ jobs:
     if: github.event.pull_request.draft == false
     name: Note edits
     # You do not appear to be able to use variables in the "uses" field.
-    uses: ./.github/workflows/reusable-proper-release-note-edits.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-proper-release-note-edits.yaml@main
     permissions:
       contents: read
     secrets:

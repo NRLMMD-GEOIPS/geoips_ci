@@ -7,8 +7,7 @@ on:
     types:
       - closed
     # You do not appear to be able to use variables in triggers
-    branches:
-      - main
+    branch: main
   # Allows run of this workflow manually from the Actions tab
   # Must be merged to default branch before it will be available
   # to manually run.
@@ -18,7 +17,7 @@ jobs:
   tag-release:
     name: Tag/release
     # You do not appear to be able to use variables in the "uses" field.
-    uses: ./.github/workflows/reusable-tag-and-release.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-tag-and-release.yaml@main
     # Only run this if the pull request was merged, not just closed.
     if: github.event.pull_request.merged == true
     permissions:

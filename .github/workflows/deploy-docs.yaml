@@ -25,7 +25,7 @@ jobs:
   deploy-docs:
     name: Deploy docs
     # You do not appear to be able to use variables in the "uses" field.
-    uses: ./.github/workflows/reusable-deploy-docs.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-deploy-docs.yaml@main
     permissions:
       contents: write
     secrets:
