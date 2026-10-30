@@ -22,9 +22,9 @@ jobs:
     name: Note edits
     # You do not appear to be able to use variables in the "uses" field.
     # Use the full owner/repo path: rulesets run this workflow in the pull
-    # request's repository, where ./.github/workflows paths do not exist. Pin a
-    # commit SHA of geoips_ci main (CodeQL actions/unpinned-tag rejects @main).
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-proper-release-note-edits.yaml@daa3fcfcae9553f30232f46df2f5b8cabdc788d0 # main
+    # request's repository, where ./.github/workflows paths do not exist. No
+    # @ref, so the default branch is used (CodeQL actions/unpinned-tag rejects @main).
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-proper-release-note-edits.yaml
     permissions:
       contents: read
     secrets:
