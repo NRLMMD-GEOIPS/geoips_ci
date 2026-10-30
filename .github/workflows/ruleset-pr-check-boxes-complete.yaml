@@ -17,6 +17,6 @@ jobs:
     if: github.event.pull_request.draft == false
     name: PR Is Ready
     # You do not appear to be able to use variables in the "uses" field.
-    uses: ./.github/workflows/reusable-pr-check-boxes-complete.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-pr-check-boxes-complete.yaml@main
     permissions:
       contents: read
