@@ -39,9 +39,8 @@ jobs:
     name: Doctest
     # You do not appear to be able to use variables in the "uses" field.
     # Use the full owner/repo path: rulesets run this workflow in the pull
-    # request's repository, where ./.github/workflows paths do not exist. No
-    # @ref, so the default branch is used (CodeQL actions/unpinned-tag rejects @main).
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-doc-test.yaml
+    # request's repository, where ./.github/workflows paths do not exist.
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-doc-test.yaml@main
     # Do not run doc-test on geoips_ci, .github, or test_data repos.  These repos
     # are not pip installable, so do not attempt to run.
     # Also never run CI on draft pull requests.
