@@ -1,0 +1,68 @@
+name: Scheduled runner prune
+
+# Removes leftover GeoIPS CI material only: labelled CI containers (and ones a
+# cancelled job left running), images tagged only with CI tags (geoips:dev-<sha>...,
+# geoips:cache), and optionally dangling GeoIPS images
+# (PRUNE_DANGLING_GEOIPS_IMAGES=true) and stale test data
+# (CLEAN_STALE_TESTDATA=true). The Docker daemon is shared, so no
+# system/builder/volume prune is ever run. See scripts/runner-prune.sh.
+#
+# The self-hosted runner must be available to this repository (runner group
+# access). The job prunes only the host whose runner picks it up; with several
+# runner hosts, run the script from cron on each host instead. GitHub also
+# disables scheduled workflows in public repositories after 60 days without
+# activity.
+
+on:
+  schedule:
+    - cron: "0 4 * * *"   # nightly
+    - cron: "0 3 * * 0"   # weekly (Sunday)
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Prune mode"
+        type: choice
+        options: [nightly, weekly]
+        default: nightly
+      dry_run:
+        description: "List what would be removed only"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runner-prune
+  cancel-in-progress: false
+
+defaults:
+  run:
+    # pipefail, so a failing script is not hidden by `tee`
+    shell: bash
+
+jobs:
+  prune:
+    runs-on: ${{ vars.RUNNER || 'self-hosted' }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+      - name: Prune
+        env:
+          TESTDATA_PATH: ${{ vars.TESTDATA_PATH }}
+          CLEAN_STALE_TESTDATA: ${{ vars.CLEAN_STALE_TESTDATA }}
+          PRUNE_DANGLING_GEOIPS_IMAGES: ${{ vars.PRUNE_DANGLING_GEOIPS_IMAGES }}
+          CI_ORPHAN_HOURS: ${{ vars.CI_ORPHAN_HOURS }}
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_MODE: ${{ inputs.mode }}
+          INPUT_DRY: ${{ inputs.dry_run }}
+        run: |
+          if [ -n "$INPUT_MODE" ]; then MODE="$INPUT_MODE"
+          elif [ "$SCHEDULE" = "0 3 * * 0" ]; then MODE=weekly
+          else MODE=nightly; fi
+          ARGS=("--$MODE")
+          [ "$INPUT_DRY" = "true" ] && ARGS+=(--dry-run)
+          ./scripts/runner-prune.sh "${ARGS[@]}" 2>&1 | tee prune.log
+          { echo "## Runner prune ($MODE)"; echo '```'; tail -n 40 prune.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

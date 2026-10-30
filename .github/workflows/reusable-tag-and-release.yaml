@@ -26,16 +26,17 @@ on:
 #   pull_request:
 #     types:
 #       - closed
-#     branch: main
+#     branches:
+#       - main
 
 jobs:
   check-release-branch:
     name: Check release branch
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-check-release-branch.yaml@main
+    uses: ./.github/workflows/reusable-check-release-branch.yaml
 
   get-versions:
     name: Get versions
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-get-versions.yaml@main
+    uses: ./.github/workflows/reusable-get-versions.yaml
     permissions:
       contents: read
     secrets:
@@ -44,7 +45,7 @@ jobs:
   print-variables:
     name: Print variables
     needs: [check-release-branch, get-versions]
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
+    uses: ./.github/workflows/reusable-print-variables.yaml
     with:
       # These are outputs defined in the check-release-branch and get-versions
       # reusable workflows.  Explicitly pass them in here to track what
@@ -71,7 +72,7 @@ jobs:
       - name: Setup git enviorment
         run: |
           git config --global user.name 'GitHub Actions'
-          git config --global user.email 'github-actions@${GITHUB_SERVER_URL/https:\/\//}'
+          git config --global user.email "github-actions@${GITHUB_SERVER_URL/https:\/\//}"
 
       - name: Tag commit
         run: |
@@ -82,10 +83,12 @@ jobs:
           git -C current_repo_current_branch push --tags
 
       - name: Create Release!
+        env:
+          GH_LOGIN_TOKEN: ${{ secrets.token }}
         run: |
           cd current_repo_current_branch
           SERVER_URL=${GITHUB_SERVER_URL/https:\/\//}
-          echo ${{ secrets.token }} | gh auth login --hostname ${SERVER_URL} --with-token
+          printf '%s' "$GH_LOGIN_TOKEN" | gh auth login --hostname "${SERVER_URL}" --with-token
 
           echo "gh release create ${{ needs.get-versions.outputs.TAGGED_VERSION }} --generate-notes"
 

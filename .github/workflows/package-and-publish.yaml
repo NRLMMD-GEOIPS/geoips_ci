@@ -25,7 +25,7 @@ jobs:
   package-publish:
     name: Package/publish
     # You do not appear to be able to use variables in the "uses" field.
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-package-and-publish.yaml@main
+    uses: ./.github/workflows/reusable-package-and-publish.yaml
     permissions:
       contents: read
     secrets:

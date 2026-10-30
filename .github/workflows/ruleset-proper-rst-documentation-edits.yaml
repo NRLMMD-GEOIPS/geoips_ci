@@ -18,6 +18,6 @@ jobs:
     if: github.event.pull_request.draft == false
     name: PR Is Ready
     # You do not appear to be able to use variables in the "uses" field.
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-proper-rst-documentation-edits.yaml@main
+    uses: ./.github/workflows/reusable-proper-rst-documentation-edits.yaml
     permissions:
       contents: read

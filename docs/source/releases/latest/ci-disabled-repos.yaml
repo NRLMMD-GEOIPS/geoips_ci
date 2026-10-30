@@ -1,0 +1,21 @@
+continuous integration:
+- title: 'Disable plugin repos with .github/ci-disabled-repos.yaml'
+  description: |
+    ``reusable-ci.yaml`` reads ``.github/ci-disabled-repos.yaml`` (repo name to
+    the reason it is disabled, for every branch), passes the names to the geoips
+    image build as the ``DISABLED_REPOS`` build argument, and lists them in the
+    job summary. The geoips install playbook leaves those repos out. The file is
+    checked first (a malformed file or a missing reason fails the run) and is
+    rejected in plugin repositories, which test in the published geoips image.
+  files:
+    added:
+    - 'docs/source/releases/latest/ci-disabled-repos.yaml'
+    modified:
+    - '.github/workflows/reusable-ci.yaml'
+    - 'README.md'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-05
+    finish: 2026-10-05
