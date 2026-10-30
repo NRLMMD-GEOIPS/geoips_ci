@@ -5,8 +5,10 @@ bug fix:
     as geoips. Their nested calls to other reusable workflows (for example
     ``reusable-fork-gate.yaml`` and ``reusable-print-variables.yaml``) used local
     ``./.github/workflows/...`` paths. They now use
-    ``NRLMMD-GEOIPS/geoips_ci/.github/workflows/...@main``, the same form the
-    ruleset workflows use. ``deploy-docs.yaml``, ``package-and-publish.yaml`` and
+    ``NRLMMD-GEOIPS/geoips_ci/.github/workflows/...`` pinned to the same
+    commit SHA of geoips_ci main as the ruleset workflows, because CodeQL
+    (``actions/unpinned-tag``) rejects unpinned ``@main`` references.
+    ``deploy-docs.yaml``, ``package-and-publish.yaml`` and
     ``tag-and-release.yaml`` only run in geoips_ci, so they keep local paths.
   files:
     modified:
