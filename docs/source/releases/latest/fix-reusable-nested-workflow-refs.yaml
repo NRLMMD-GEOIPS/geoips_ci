@@ -1,0 +1,26 @@
+bug fix:
+- title: 'Use full references for nested reusable workflow calls'
+  description: |
+    The ``reusable-*.yaml`` workflows are called from other repositories, such
+    as geoips. Their nested calls to other reusable workflows (for example
+    ``reusable-fork-gate.yaml`` and ``reusable-print-variables.yaml``) used local
+    ``./.github/workflows/...`` paths. They now use
+    ``NRLMMD-GEOIPS/geoips_ci/.github/workflows/...@main``, the same form the
+    ruleset workflows use. ``deploy-docs.yaml``, ``package-and-publish.yaml`` and
+    ``tag-and-release.yaml`` only run in geoips_ci, so they keep local paths.
+  files:
+    modified:
+    - '.github/workflows/reusable-build-docker-image.yaml'
+    - '.github/workflows/reusable-ci.yaml'
+    - '.github/workflows/reusable-deploy-docs.yaml'
+    - '.github/workflows/reusable-doc-test.yaml'
+    - '.github/workflows/reusable-lint.yaml'
+    - '.github/workflows/reusable-package-and-publish.yaml'
+    - '.github/workflows/reusable-proper-release-note-edits.yaml'
+    - '.github/workflows/reusable-tag-and-release.yaml'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-30
+    finish: 2026-10-30

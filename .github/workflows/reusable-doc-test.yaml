@@ -38,7 +38,7 @@ jobs:
   # reusable-fork-gate.yaml. Every job below depends on this gate.
   fork-gate:
     name: Fork approval gate
-    uses: ./.github/workflows/reusable-fork-gate.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-fork-gate.yaml@main
     with:
       environment: ${{ inputs.fork_approval_environment }}
 
@@ -57,7 +57,7 @@ jobs:
     needs: [fork-gate]
     if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
     # You do not appear to be able to use variables in this "uses" field.
-    uses: ./.github/workflows/reusable-build-docker-image.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-build-docker-image.yaml@main
     secrets:
       token: ${{ secrets.token }}
       docker_token: ${{ secrets.docker_token }}
@@ -119,7 +119,7 @@ jobs:
     needs: [fork-gate, get-job-flags]
     if: ${{ needs.fork-gate.outputs.allowed == 'true' }}
     # You do not appear to be able to use variables in this "uses" field.
-    uses: ./.github/workflows/reusable-print-variables.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
     with:
       # These are outputs defined above.  Explicitly pass them in here to track
       # what variables we have available to this workflow.

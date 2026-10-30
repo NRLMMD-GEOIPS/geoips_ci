@@ -32,11 +32,11 @@ on:
 jobs:
   check-release-branch:
     name: Check release branch
-    uses: ./.github/workflows/reusable-check-release-branch.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-check-release-branch.yaml@main
 
   get-versions:
     name: Get versions
-    uses: ./.github/workflows/reusable-get-versions.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-get-versions.yaml@main
     permissions:
       contents: read
     secrets:
@@ -45,7 +45,7 @@ jobs:
   print-variables:
     name: Print variables
     needs: [check-release-branch, get-versions]
-    uses: ./.github/workflows/reusable-print-variables.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
     with:
       # These are outputs defined in the check-release-branch and get-versions
       # reusable workflows.  Explicitly pass them in here to track what

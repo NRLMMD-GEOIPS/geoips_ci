@@ -130,7 +130,7 @@ jobs:
     name: Print build image variables
     needs: [get-job-flags]
     # You do not appear to be able to use variables in this "uses" field.
-    uses: ./.github/workflows/reusable-print-variables.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
     with:
       # These are outputs defined above.  Explicitly pass them in here to track
       # what variables we have available to this workflow.

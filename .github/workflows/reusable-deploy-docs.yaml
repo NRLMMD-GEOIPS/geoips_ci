@@ -21,7 +21,7 @@ on:
 jobs:
   print-variables:
     name: Print variables
-    uses: ./.github/workflows/reusable-print-variables.yaml
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-print-variables.yaml@main
 
   deploy_ghpages:
     runs-on: ${{ vars.RUNNER }}
