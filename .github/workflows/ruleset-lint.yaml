@@ -20,8 +20,9 @@ jobs:
     name: Lint
     # You do not appear to be able to use variables in the "uses" field.
     # Use the full owner/repo path: rulesets run this workflow in the pull
-    # request's repository, where ./.github/workflows paths do not exist.
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-lint.yaml@main
+    # request's repository, where ./.github/workflows paths do not exist. Pin a
+    # commit SHA of geoips_ci main (CodeQL actions/unpinned-tag rejects @main).
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-lint.yaml@daa3fcfcae9553f30232f46df2f5b8cabdc788d0 # main
     # Only runs if the pull request is NOT a draft and this is not a test data repo
     if: >-
       github.event.pull_request.draft == false &&
@@ -36,8 +37,9 @@ jobs:
     name: Spell Check Changed Files
     # You do not appear to be able to use variables in the "uses" field.
     # Use the full owner/repo path: rulesets run this workflow in the pull
-    # request's repository, where ./.github/workflows paths do not exist.
-    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-cspell-spell-checking.yaml@main
+    # request's repository, where ./.github/workflows paths do not exist. Pin a
+    # commit SHA of geoips_ci main (CodeQL actions/unpinned-tag rejects @main).
+    uses: NRLMMD-GEOIPS/geoips_ci/.github/workflows/reusable-cspell-spell-checking.yaml@daa3fcfcae9553f30232f46df2f5b8cabdc788d0 # main
     permissions:
       contents: read
       pull-requests: read

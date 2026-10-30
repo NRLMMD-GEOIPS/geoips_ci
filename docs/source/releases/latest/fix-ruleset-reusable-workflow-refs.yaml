@@ -5,7 +5,9 @@ bug fix:
     ``./.github/workflows/...`` paths. Organization rulesets run these workflows
     in the repository of the pull request, so the local paths pointed at files
     that do not exist there. Every ruleset check failed to start, with no jobs.
-    They now call ``NRLMMD-GEOIPS/geoips_ci/.github/workflows/...@main`` again.
+    They now call ``NRLMMD-GEOIPS/geoips_ci/.github/workflows/...`` pinned to a
+    commit SHA of geoips_ci main, because CodeQL (``actions/unpinned-tag``)
+    rejects unpinned ``@main`` references.
   files:
     modified:
     - '.github/workflows/ruleset-doc-test.yaml'
