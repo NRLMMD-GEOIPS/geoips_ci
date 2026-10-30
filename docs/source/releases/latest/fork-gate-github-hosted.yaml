@@ -1,0 +1,16 @@
+bug fix:
+- title: 'Run the fork approval gate result job on GitHub-hosted runners'
+  description: |
+    The ``result`` job of ``reusable-fork-gate.yaml`` was moved to
+    ``self-hosted`` during the 2026-10-05 GitHub Actions incident. It runs
+    before approval is decided, so it is back on ``ubuntu-latest``, like the
+    ``approval`` job.
+  files:
+    modified:
+    - '.github/workflows/reusable-fork-gate.yaml'
+  related-issue:
+    number: null
+    repo_url: 'https://github.com/NRLMMD-GEOIPS/geoips_ci'
+  date:
+    start: 2026-10-30
+    finish: 2026-10-30
