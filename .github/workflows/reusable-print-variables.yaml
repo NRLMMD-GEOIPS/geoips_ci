@@ -51,7 +51,7 @@ on:
 
 jobs:
   print-variables:
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     name: Print variables
     steps:
       - name: Print run flags

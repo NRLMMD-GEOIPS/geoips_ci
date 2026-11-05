@@ -54,7 +54,7 @@ jobs:
       TAGGED_VERSION: ${{ needs.get-versions.outputs.TAGGED_VERSION }}
 
   tag-and-release:
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     name: Tag/release
     permissions:
       contents: write

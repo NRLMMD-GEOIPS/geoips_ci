@@ -1,0 +1,28 @@
+bug fix:
+- title: 'Set fallback values for variables unavailable to runs from forks'
+  description: >
+    Repository variables are not available to jobs directly triggered by PRs from
+    forks, so actions relying upon non-empty variables in `vars` or other actions
+    contexts will fail unless fixed defaults are provided. To fix these otherwise
+    broken CI workflows, this sets `ubuntu-latest` as the fallback to `vars.RUNNER`,
+    `NRLMMD-GEOIPS` for `vars.GEOIPS_ORGANIZATION`, and `main` for
+    `vars.GEOIPS_DEFAULT_BRANCH`. Workflows that are intended to only be run on a
+    non-public runner (and are thereby behind the fork-approval gate) are not given
+    such fallbacks.
+  files:
+    modified:
+    - '.github/workflows/reusable-build-docker-image.yaml'
+    - '.github/workflows/reusable-check-release-branch.yaml'
+    - '.github/workflows/reusable-ci.yaml'
+    - '.github/workflows/reusable-deploy-docs.yaml'
+    - '.github/workflows/reusable-doc-test.yaml'
+    - '.github/workflows/reusable-get-versions.yaml'
+    - '.github/workflows/reusable-lint.yaml'
+    - '.github/workflows/reusable-package-and-publish.yaml'
+    - '.github/workflows/reusable-print-variables.yaml'
+    - '.github/workflows/reusable-tag-and-release.yaml'
+    - '.github/workflows/status-check.yaml'
+    - 'sync/.github/workflows/status-check.yaml'
+  date:
+    start: '2026-11-05'
+    finish: null

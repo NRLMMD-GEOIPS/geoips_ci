@@ -9,7 +9,7 @@ on:
 
 jobs:
   check-release-branch:
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     name: Check release branch
     outputs:
       # Note pull request merged does not propagate to reusable workflows
