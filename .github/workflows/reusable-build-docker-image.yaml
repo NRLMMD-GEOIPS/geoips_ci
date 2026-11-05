@@ -59,7 +59,7 @@ defaults:
 jobs:
   # Set variables that should be accessible to all jobs
   get-job-flags:
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     env:
       CURR_REPO: ${{ github.event.repository.name }}
       # Pull requests from forks have no registry credentials and cannot push
@@ -147,7 +147,7 @@ jobs:
   # from /packages/geoips.
   build_doclinttest_image:
     # runs-on: ${{ fromJSON(vars.RUNNER_DOCKERRUN || vars.RUNNER) }}
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     needs: get-job-flags
     # Never for fork pull requests: no registry credentials, and the push would
     # publish fork-built images under this repository's tags.

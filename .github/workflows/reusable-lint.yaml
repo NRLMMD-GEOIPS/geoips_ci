@@ -130,8 +130,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          repository: ${{ vars.GEOIPS_ORGANIZATION }}/geoips
-          ref: ${{ vars.GEOIPS_DEFAULT_BRANCH }}
+          repository: ${{ vars.GEOIPS_ORGANIZATION || 'NRLMMD-GEOIPS' }}/geoips
+          ref: ${{ vars.GEOIPS_DEFAULT_BRANCH || 'main' }}
           token: ${{ secrets.token }}
           path: ./geoips_repo_default_branch
           clean: true
