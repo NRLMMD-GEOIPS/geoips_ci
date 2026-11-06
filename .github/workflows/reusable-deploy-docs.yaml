@@ -29,7 +29,7 @@ jobs:
     uses: ./.github/workflows/reusable-print-variables.yaml
 
   define-matrix:
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     name: "Determine which iterations of versions of docs should be built and deployed"
     outputs:
       include: ${{ steps.set-matrix.outputs.include }}
@@ -88,7 +88,7 @@ jobs:
           fi
 
   produce-docs-artifacts:
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     needs: define-matrix
     name: "Build docs for later upload to GitHub Pages"
     strategy:
@@ -226,7 +226,7 @@ jobs:
           retention-days: 1
 
   deploy-docs-artifacts:
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     needs: produce-docs-artifacts
     name: "Deploy collected docs to GitHub Pages"
     permissions:
@@ -291,10 +291,25 @@ jobs:
           cd ./ghpages_repo
           rm -rf dev
 
-      - name: Download all docs builds (if GitHub Hosted)
+      - name: Download all docs builds to staging
         uses: actions/download-artifact@v8  # REVIEW: GHES requires a downgrade to v3 (no change to arguments)
         with:
-          path: ghpages_repo
+          path: docs_staging
+
+      - name: Move docs builds from staging to ghpages
+        run: |
+          # If only one doc build was produced, we don't know if it was extracted to the base directory (v8 behavior) or the subdirectory with artifact name (v3 behavior)
+          if [ -f docs_staging/index.html ]; then
+            # Now decide if dev or docs based on $DOCS_BUILD_STRATEGY
+            if [[ "$DOCS_BUILD_STRATEGY" == "versioned-rebuild" ]]; then
+              mkdir -p ghpages_repo/dev
+              cp -r docs_staging/* ghpages_repo/dev/.
+            else
+              mkdir -p ghpages_repo/docs
+              cp -r docs_staging/* ghpages_repo/docs/.
+          else
+            cp -r docs_staging/* ghpages_repo/.
+          fi
 
       - name: Create support files (/docs only)
         if: ${{ env.DOCS_BUILD_STRATEGY == '' || env.DOCS_BUILD_STRATEGY == 'basic' }}
@@ -309,11 +324,10 @@ jobs:
           PACKAGE_BASE_URL: ${{ vars.PACKAGE_BASE_URL }} # REVIEW (If empty, defaults to default of docs/create_support_files.py, which is 'https://nrlmmd-geoips.github.io/geoips/'; generally ought to be 'https://{{ GEOIPS_ORGANIZATION }}.github.io/{{ REPO_NAME }}/' unless using a custom domain. This is only relevant for versioned builds (as it is for the version switcher config file).)
         run: |
           cd ./ghpages_repo
-          # Copy gitignore, DISTRIBUTION, LICENSE, and workflows from main repo
+          # Copy gitignore, DISTRIBUTION, and LICENSE from main repo
           cp ../geoips_default_branch/.gitignore .
           cp ../geoips_default_branch/DISTRIBUTION .
           cp ../geoips_default_branch/LICENSE .
-          cp -r ../geoips_default_branch/.github .
           # Create ghpages README
           echo -e "## GitHub Pages deployment branch\n\nThis branch is for docs deployment only, and is not intended to be interacted with directly." > README.md
           # Create nojekyll
