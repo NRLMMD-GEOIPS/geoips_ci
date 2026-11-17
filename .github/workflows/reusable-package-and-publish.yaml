@@ -39,7 +39,7 @@ jobs:
 
   package_and_publish:
     name: "Deploy to Pypi"
-    runs-on: ${{ vars.RUNNER }}
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     permissions:
       contents: read
     steps:
